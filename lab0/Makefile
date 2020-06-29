@@ -1,5 +1,5 @@
 default :
-	gcc -g -Wall -Wextra lab0.c -o lab0
+	/usr/local/cs/bin/gcc -g -Wall -Wextra lab0.c -o lab0
 
 clean :
 	rm -f *.o lab0 *.txt *.tar.gz

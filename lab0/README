@@ -1,0 +1,40 @@
+NAME : Changhui Youn
+EMAIL : tonyyoun2@gmail.com
+ID : 304207830
+
+For project 0, I created a program that accepts 4 arguments : 
+--input
+--output
+--segfault
+--catch
+and handles each argument accordingly.
+
+When input file is specified, file descriptor(ifd) is obtained from open().
+Then, make file descriptor 0 point to what ifd is pointing using dup.
+If ifd is less than 0, it returns an error and exit with exit code 2.
+
+When output file is specified, file descriptor(ofd) is obtained from creat().
+Then, make file descriptor 1 point to what ofd is pointing using dup.
+If ofd is less than 0, it returns an error and exit with exit code 3.
+
+If segfault argument is received, a flag is set to 1 invoking a function that
+triggers segmentation fault. I did not call this function right away
+in the switch statment so that if --catch argument is also called, 
+sigsegv_handler function can be assigned to SIGSEGV signal.
+
+For catch argument, I assign sigsegv_handler that prints out segmentation fault
+error and exits with exit code 4 to SIGSEGV using signal().
+
+Smoke Test
+I check the program with few tests. 
+First, --input --output argments are tested. 
+correctFilename checks whether it works properly when correct filename is given.
+wrongFilename checks whether it exits with correct exit code when wrong filename is given.
+noPermission checks whether it exits with correct exit code when 
+it does not have access to the file.
+invalidArgs checks whether it exits with correct exit code when 
+invalid arguments are given when running program.
+catchSegFault checks if program catchs segmentation fault properly.
+
+Reference
+Skeleton code from Discussion 1B.

@@ -53,7 +53,7 @@ fi
 
 # get copy of our grading/checking functions
 if [ -s functions.sh ]; then
-	source functions.sh
+	source ./functions.sh
 else
 	wget $LIBRARY_URL/functions.sh 2> /dev/null
 	if [ $? -eq 0 ]; then

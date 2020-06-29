@@ -1,24 +1,24 @@
-default :
+default:
 	/usr/local/cs/bin/gcc -g -Wall -Wextra lab0.c -o lab0
 
-clean :
+clean:
 	rm -f *.o lab0 *.txt *.tar.gz
 
-dist : default
+dist: default
 	tar -czf lab0-304207830.tar.gz lab0.c Makefile *.png README
 
-check : default inputfileTest invalidArgs catchSegFault
+check: default inputfileTest invalidArgs catchSegFault
 	cat resultFile.txt;\
 	rm -f *.txt;\
 
-inputfileTest : createFile correctFilename wrongFilename permission noPermission
+inputfileTest: createFile correctFilename wrongFilename permission noPermission
 
-createFile : 
+createFile: 
 	echo "Test File" > input.txt; \
 	echo "Test Result" > resultFile.txt; \
 
 
-correctFilename :
+correctFilename:
 	./lab0 --input=input.txt --output=output.txt &> /dev/null;\
 	if [[ $$? -eq 0 ]];\
 	then\
@@ -27,7 +27,7 @@ correctFilename :
 		echo "correctFilename : Program exited with an error" >> resultFile.txt;\
 	fi\
 
-wrongFilename :
+wrongFilename:
 	./lab0 --input=inputt.txt --output=output.txt &> /dev/null;\
 	if [[ $$? -eq 2 ]];\
 	then\
@@ -36,10 +36,10 @@ wrongFilename :
 		echo "wrongFilename : Program exited with an error" >> resultFile.txt;\
 	fi\
 
-permission : 
+permission: 
 	chmod 111 input.txt;\
 
-noPermission :
+noPermission:
 	./lab0 --input=input.txt --output=output.txt &> /dev/null;\
 	if [[ $$? -eq 2 ]];\
 	then\
@@ -50,7 +50,7 @@ noPermission :
 		chmod 666 input.txt;\
 	fi\
 
-invalidArgs : 
+invalidArgs: 
 	./lab0 --invalid &> /dev/null;\
 	if [[ $$? -eq 1 ]]; then \
 	echo "invalidArgs : Unrecognized arguement. Program exited with 1" >> resultFile.txt; \

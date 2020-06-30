@@ -53,7 +53,7 @@ fi
 
 # get copy of our grading/checking functions
 if [ -s functions.sh ]; then
-	source ./functions.sh
+	source functions.sh
 else
 	wget $LIBRARY_URL/functions.sh 2> /dev/null
 	if [ $? -eq 0 ]; then
@@ -93,6 +93,30 @@ let errors+=$?
 echo "... checking for submitter name in $README"
 NAME=`getName $README`
 let errors+=$?
+
+echo "... checking slip-day use in $README"
+SLIPDAYS=0
+slips=`grep "SLIPDAYS:" $README`
+if [ $? -eq 0 ]
+then
+	slips=`echo $slips | cut -d: -f2 | tr -d \[:space:\]`
+	if [ -n "$slips" ]
+	then
+		if [[ $slips == ?([0-9]) ]]
+		then
+			SLIPDAYS=$slips
+			echo "    $SLIPDAYS days"
+		else
+			echo "    INVALID SLIPDAYS: $slips"
+			let errors+=1
+		fi
+	else
+		echo "    EMPTY SLIPDAYS ENTRY"
+		let errors+=1
+	fi
+else
+	echo "    no SLIPDAYS: entry"
+fi
 
 echo "... checking for other expected files"
 checkFiles $MAKEFILE $EXPECTED
@@ -296,6 +320,14 @@ do
 		let errors+=1
 	fi
 done
+
+echo
+if [ $SLIPDAYS -eq 0 ]
+then
+	echo "THIS SUBMISSION WILL USE NO SLIP-DAYS"
+else
+	echo "THIS SUBMISSION WILL USE $SLIPDAYS SLIP-DAYS"
+fi
 
 echo
 echo "THE ONLY STUDENTS WHO WILL RECEIVE CREDIT FOR THIS SUBMISSION ARE:"

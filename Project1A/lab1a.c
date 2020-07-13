@@ -40,18 +40,10 @@ void terminal_setup(void) {
 	tcsetattr(0, TCSANOW, &tmp);
 }
 
-void shell_exit_status() {
-	int status;
-	waitpid(pid, &status, 0);
-	fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WIFSIGNALED(status), WEXITSTATUS(status));
-}
-
 void signal_handler(int sig){
     if(sig == SIGPIPE){
     	fprintf(stderr, "SIGPIPE received!");
 		close(from_shell[0]);
-		// kill(pid, SIGINT);
-		// shell_exit_status();
 		exit(0);
 	}
 }
@@ -119,16 +111,15 @@ int main(int argc, char* argv[]) {
 			close(to_shell[0]);
 			close(from_shell[1]);
 
-
 			struct pollfd pollfds[2];
 			pollfds[0].fd = 0;
 			pollfds[0].events = POLLIN | POLLHUP | POLLERR;
 			pollfds[1].fd = from_shell[0];
 			pollfds[1].events = POLLIN | POLLHUP | POLLERR;
 
-			int ctrl_c = 0;
+			int end_loop = 0;
 
-			while (!ctrl_c) {
+			while (!end_loop) {
 				if((poll(pollfds, 2, -1)) > 0) {
 					if(pollfds[0].revents == POLLIN) {
 						char buffer[256];
@@ -151,7 +142,7 @@ int main(int argc, char* argv[]) {
 							} else if(buffer[i] == 0x04){
 								printf("^D\n");
 								close(to_shell[1]);
-								ctrl_c = 1;
+								end_loop = 1;
 							} else if(buffer[i] == 0x03){
 								printf("^C\n");
 								kill(pid, SIGINT);
@@ -167,17 +158,12 @@ int main(int argc, char* argv[]) {
 							}
 						}
 					// Handles EOF/Error from the stdout/stderr of the child process
-					} else if(pollfds[0].revents & POLLHUP){
+					} else if(pollfds[0].revents & (POLLHUP | POLLERR)){
 						// hup : fd is closed by other end
 						close(from_shell[0]);
-						ctrl_c = 1;
-					} else if (pollfds[0].revents & POLLERR) {
-						// err : err occured
-						fprintf(stderr, "Poll error in STDIN\n");
-						close(from_shell[0]);
-						exit(1);
-
-					}
+						kill(pid, SIGINT);
+						end_loop = 1;
+					} 
 
 					if(pollfds[1].revents == POLLIN) {
 						char buffer[256];
@@ -200,14 +186,16 @@ int main(int argc, char* argv[]) {
 								}
 							}
 						}
-					} else if (pollfds[1].revents & POLLERR || pollfds[1].revents & POLLHUP) { //polling error
-						ctrl_c = 1;
+					} else if (pollfds[1].revents & (POLLERR | POLLHUP)) {
 						close(from_shell[0]);
+						end_loop = 1;
 					} 
 				} 
 			}
 
-			shell_exit_status();
+			int status;
+			waitpid(pid, &status, 0);
+			fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", (status & 0x007f), (status & 0xff00));
 			exit(0);
 		} else {
 			fprintf(stderr, "Fork failed\n");

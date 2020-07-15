@@ -7,16 +7,14 @@ ID: 304207830
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
-#include <getopt.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <getopt.h>
 #include <termios.h>
-#include <stdbool.h>
+#include <poll.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <poll.h>
 
 #define SHELL 's'
 
@@ -158,12 +156,15 @@ int main(int argc, char* argv[]) {
 							}
 						}
 					// Handles EOF/Error from the stdout/stderr of the child process
-					} else if(pollfds[0].revents & (POLLHUP | POLLERR)){
+					} else if(pollfds[0].revents & POLLHUP){
 						// hup : fd is closed by other end
 						close(from_shell[0]);
-						kill(pid, SIGINT);
 						end_loop = 1;
-					} 
+					} else if (pollfds[0].revents & POLLERR) {
+						// err : err occured
+						close(from_shell[0]);
+						exit(1);
+					}
 
 					if(pollfds[1].revents == POLLIN) {
 						char buffer[256];
@@ -174,7 +175,7 @@ int main(int argc, char* argv[]) {
 						}
 						int i;
 						for(i = 0; i < res; i++) {
-							if(buffer[i] == '\r' || buffer[i] == '\n'){ 
+							if(buffer[i] == '\n'){ 
 								if((write(1, rn, sizeof(char)*2)) < 0) {
 									fprintf(stderr, "Writing to STDOUT failed. Error: %d\n", errno);
 									exit(1);

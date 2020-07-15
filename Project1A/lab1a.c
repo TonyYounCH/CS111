@@ -196,7 +196,7 @@ int main(int argc, char* argv[]) {
 
 			int status;
 			waitpid(pid, &status, 0);
-			fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", (status & 0x007f), (status & 0xff00));
+			fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));
 			exit(0);
 		} else {
 			fprintf(stderr, "Fork failed\n");

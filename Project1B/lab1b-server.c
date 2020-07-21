@@ -44,6 +44,7 @@ void signal_handler(int sig){
 	if(sig == SIGPIPE){
 		fprintf(stderr, "SIGPIPE received!");
 		close(from_shell[0]);
+		close(to_shell[1]);
 		exit(0);
 	} else if(sig == SIGINT) {
 		kill(pid, SIGINT);
@@ -129,19 +130,11 @@ void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void *
 	} while (stream->avail_in > 0);
 }
 
-void at_exit_signal(){
-	close(socket_fd);
-}
-
-void comp_end(){
-	deflateEnd(&to_client);
-	inflateEnd(&from_client);
-}
-
 void harvest()
 {	
 	if(comp_flag) {
-		comp_end();
+		deflateEnd(&to_client);
+		inflateEnd(&from_client);
 	}
 	close(socket_fd);
 	close(from_shell[0]);
@@ -237,7 +230,7 @@ int main(int argc, char* argv[]) {
 
 		int end_loop = 0;
 
-		atexit(harvest);
+		// atexit(harvest);
 		
 		while (!end_loop) {
 			if((poll(pollfds, 2, -1)) > 0) {
@@ -266,6 +259,9 @@ int main(int argc, char* argv[]) {
 								end_loop = 1;
 							} else if(out_buf[i] == 0x03){
 								kill(pid, SIGINT);
+							} else if(out_buf[i] == EOF){
+								close(from_shell[0]);
+								end_loop = 1;
 							} else { 
 								if((write(to_shell[1], &out_buf[i], sizeof(char))) < 0) {
 									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
@@ -286,6 +282,9 @@ int main(int argc, char* argv[]) {
 								end_loop = 1;
 							} else if(buffer[i] == 0x03){
 								kill(pid, SIGINT);
+							} else if(buffer[i] == EOF){
+								close(from_shell[0]);
+								end_loop = 1;
 							} else { 
 								if((write(to_shell[1], &buffer[i], sizeof(char))) < 0) {
 									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
@@ -366,7 +365,7 @@ int main(int argc, char* argv[]) {
 				} 
 			} 
 		}
-
+		harvest();
 	} else {
 		fprintf(stderr, "Fork failed\n");
 		exit(1);

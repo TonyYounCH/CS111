@@ -231,9 +231,9 @@ int main(int argc, char* argv[]) {
 					fprintf(stderr, "Reading from input failed. Error: %d\n", errno);
 					exit(1);
 				}
-				// if(res == 0) {
-				// 	exit(0);
-				// }
+				if(res == 0) {
+					exit(0);
+				}
 
 				if(comp_flag) {
 					char out_buf[1024];

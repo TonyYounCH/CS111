@@ -7,356 +7,332 @@ ID: 304207830
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <getopt.h>
-#include <termios.h>
-#include <assert.h>
-#include <poll.h>
-#include <string.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <termios.h>
+#include <assert.h>
+#include <stdbool.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <poll.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <netdb.h>
-#include "zlib.h"
+#include <netinet/in.h>
+#include <string.h>
+#include <zlib.h>
 
-#define PORT 'p'
-#define SHELL 's'
-#define COMP 'c'
+#define CR '\015' //carriage return
+#define LF '\012' //line feed
+#define EOT '\004' //^D (End of transmission)
+#define ETX '\003' //^C (End of text)
 
-struct termios saved_original;
-
-int from_shell[2];
-int to_shell[2];
+int pipe_ptoc[2];
+int pipe_ctop[2];
 int pid;
-int socket_fd;
-int comp_flag = 0;
-z_stream to_client;
-z_stream from_client;
+char crlf[2] = {CR, LF};
+int sock;
+int sock2;
+z_stream client_to_server;
+z_stream server_to_client;
 
-void signal_handler(int sig){
-	if(sig == SIGPIPE){
-		fprintf(stderr, "SIGPIPE received!");
-		close(from_shell[0]);
-		close(to_shell[1]);
-		exit(0);
-	} else if(sig == SIGINT) {
-		kill(pid, SIGINT);
-	}
-}
-
-int server_connect(unsigned int port_num) {
-	int sockfd, new_fd;
-	struct sockaddr_in my_addr;
-	struct sockaddr_in their_addr;
-	unsigned int sin_size;
-
-	// sock
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
-		fprintf(stderr, "TCP/IP socket creation failed\n");
-		exit(1);
-	}
-
-	my_addr.sin_family = AF_INET;
-	my_addr.sin_port = htons(port_num);
-	my_addr.sin_addr.s_addr = INADDR_ANY;
-
-	memset(my_addr.sin_zero, '\0', sizeof(my_addr.sin_zero));
-
-	if(bind(sockfd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr)) == -1){
-		//some error handling
-		fprintf(stderr, "Bind to socket failed\n");
-		exit(1);
-	}
-
-	if(listen(sockfd, 5) == -1) {
-		//some error handling
-		fprintf(stderr, "Listening socket failed\n");
-		exit(1);
-	}
-
-	while(1) {
-		sin_size = sizeof(struct sockaddr_in);
-		if((new_fd = accept(sockfd, (struct sockaddr*) &their_addr, &sin_size)) == -1){
-			//some error handling
-			fprintf(stderr, "Accept inputs from socket failed\n");
-			exit(1);
-			continue;
-		} else {
-			close(sockfd);
-			break;
-		}
-	}
-	return new_fd;
-}
-
-
-void init_compress_stream (z_stream * stream) {
-	stream->zalloc = Z_NULL, stream-> zfree = Z_NULL, stream-> opaque = Z_NULL;
-	if (deflateInit(stream, Z_DEFAULT_COMPRESSION) != Z_OK) {
-		fprintf(stderr, "Server : deflateInit failed\n");
-		exit(1);
-	}
-}
-
-void init_decompress_stream (z_stream * stream) {
-	stream->zalloc = Z_NULL, stream-> zfree = Z_NULL, stream-> opaque = Z_NULL;
-	if (inflateInit(stream) != Z_OK) {
-		fprintf(stderr, "Server : inflateInit failed\n");
-		exit(1);
-	}
-}
-
-void compress_stream (z_stream * stream, void * orig_buf, int orig_len, void * out_buf, int out_len) {
-
-	stream->next_in = orig_buf, stream->avail_in = orig_len;
-	stream->next_out = out_buf, stream->avail_out = out_len;
-	do {
-		deflate(stream, Z_SYNC_FLUSH);
-	} while (stream->avail_in > 0);
-}
-
-void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void * out_buf, int out_len) {
-	stream->next_in = orig_buf, stream->avail_in = orig_len;
-	stream->next_out = out_buf, stream->avail_out = out_len;
-	do {
-		inflate(stream, Z_SYNC_FLUSH);
-	} while (stream->avail_in > 0);
-}
-
-void harvest()
-{	
-	if(comp_flag) {
-		deflateEnd(&to_client);
-		inflateEnd(&from_client);
-	}
-	close(to_shell[1]);
+void shell_exit_status() {
 	int status;
 	waitpid(pid, &status, 0);
-	fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));
-	close(socket_fd);
-	close(from_shell[0]);
+	fprintf(stderr, "SHELL EXIT SIGNAL=%d STATUS=%d\n", WIFSIGNALED(status), WEXITSTATUS(status));
+}
+
+void handle_sigpipe() {
+	close(pipe_ptoc[1]);
+	close(pipe_ctop[0]);
+	kill(pid, SIGKILL);
+	shell_exit_status();
+	exit(0);
 }
 
 int main(int argc, char* argv[]) {
+	/* supports --port and --compress options */
+
 	struct option options[] = {
-		{"port", 1, NULL, PORT},
-		{"shell", 1, NULL, SHELL},
-		{"compress", 0, NULL, COMP},
-		{0, 0, 0, 0}
+		{"port", required_argument, NULL, 'p'},
+    		{"compress", no_argument, NULL, 'c'},
+    		{0, 0, 0, 0}
 	};
 
-	int port_no = 0;
-	int mandatory = 0;
-	char rn[2] = {'\r', '\n'};
-	char* program = "/bin/bash";
+	int portno = 0;
+	int compress_flag = 0;
+	int port_flag = 0;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
+	while ( (opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
-			case PORT: 
-				port_no = atoi(optarg);
-				mandatory = 1;
+			case 'p': 
+				portno = atoi(optarg);
+				port_flag = 1;
 				break;
-			case SHELL: 
-				program = optarg;
-				break;
-			case COMP: 
-				comp_flag = 1;
-				init_compress_stream(&to_client);
-				init_decompress_stream(&from_client);
 
-				break;
-			default:
-				fprintf(stderr, "Invalid argument(s)\nYou may use --port=port# (mandatory), --shell=program, or --compress only.\n");
-				exit(1);
-				break;
-		}
-	}
-	if(!mandatory) {
-		fprintf(stderr, "--port=port# option is mandatory\n");
-		exit(1);
-	}
+			case 'c':
+				compress_flag = 1;
 
-	socket_fd = server_connect(port_no);
-	//set the terminal to the non-canonical, no echo mode
-	//register sigpipe handler create pipe, for process, stdin/out redirection
-	if(pipe(to_shell) != 0) {
-		fprintf(stderr, "Pipe to shell failed!\n");
-		exit(1);
-	}
-	if(pipe(from_shell) != 0) {
-		fprintf(stderr, "Pipe from shell failed!\n");
-		exit(1);
-	}
+				server_to_client.zalloc = Z_NULL;
+				server_to_client.zfree = Z_NULL;
+				server_to_client.opaque = Z_NULL;
 
-	signal(SIGPIPE, signal_handler);
-
-	pid = fork();
-	if(pid == 0) {
-		//Child Process
-		close(to_shell[1]);
-		close(from_shell[0]);
-		close(0);
-		dup(to_shell[0]);
-		close(1);
-		dup(from_shell[1]);
-		close(2);
-		dup(from_shell[1]);
-		close(to_shell[0]);
-		close(from_shell[1]);
-
-		if(execlp(program, program, NULL) == -1) {
-			fprintf(stderr, "Exec shell failed!\n");
-			exit(1);
-		}
-	} else if (pid > 0) {
-		//Parent Process
-		close(to_shell[0]);
-		close(from_shell[1]);
-
-		struct pollfd pollfds[2];
-		pollfds[0].fd = socket_fd;
-		pollfds[0].events = POLLIN | POLLHUP | POLLERR;
-		pollfds[1].fd = from_shell[0];
-		pollfds[1].events = POLLIN | POLLHUP | POLLERR;
-
-		int end_loop = 0;
-
-		atexit(harvest);
-		
-		while (!end_loop) {
-			if((poll(pollfds, 2, -1)) > 0) {
-				if(pollfds[0].revents == POLLIN) {
-					char buffer[256];
-					int res = read(socket_fd, &buffer, 256);
-					if(res < 0) {
-						fprintf(stderr, "Reading from socket failed. Error: %d\n", errno);
-						exit(1);
-					}
-
-					if (comp_flag) {
-						char out_buf[1024];
-						int out_len = 1024;
-						decompress_stream(&from_client, buffer, res, out_buf, out_len);
-
-						int i;
-						for (i = 0; (unsigned int) i < out_len - from_client.avail_out; i++) {
-							if(out_buf[i] == '\r' || out_buf[i] == '\n'){ 
-								if((write(to_shell[1], &rn[1], sizeof(char))) < 0) {
-									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
-									exit(1);
-								}
-							} else if(out_buf[i] == 0x04){
-								close(to_shell[1]);
-								end_loop = 1;
-							} else if(out_buf[i] == 0x03){
-								kill(pid, SIGINT);
-							} else { 
-								if((write(to_shell[1], &out_buf[i], sizeof(char))) < 0) {
-									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
-									exit(1);
-								}
-							}
-						}
-					} else {
-						int i;
-						for(i = 0; i < res; i++) {
-							if(buffer[i] == '\r' || buffer[i] == '\n'){ 
-								if((write(to_shell[1], &rn[1], sizeof(char))) < 0) {
-									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
-									exit(1);
-								}
-							} else if(buffer[i] == 0x04){
-								close(to_shell[1]);
-								end_loop = 1;
-							} else if(buffer[i] == 0x03){
-								kill(pid, SIGINT);
-							} else { 
-								if((write(to_shell[1], &buffer[i], sizeof(char))) < 0) {
-									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
-									exit(1);
-								}
-							}
-						}
-
-					}
-				// Handles EOF/Error from the stdout/stderr of the child process
-				} else if(pollfds[0].revents & POLLHUP){
-					// hup : fd is closed by other end
-					end_loop = 1;
-				} else if (pollfds[0].revents & POLLERR) {
-					// err : err occured
+				if (deflateInit(&server_to_client, Z_DEFAULT_COMPRESSION) != Z_OK) {
+					fprintf(stderr, "Failure to deflateInit on client side.\n");
 					exit(1);
 				}
 
-				if(pollfds[1].revents == POLLIN) {
-					char buffer[256];
-					int res = read(from_shell[0], &buffer, 256);
-					if(res < 0) {
-						fprintf(stderr, "Reading from input failed. Error: %d\n", errno);
-						exit(1);
-					}
+				client_to_server.zalloc = Z_NULL;
+				client_to_server.zfree = Z_NULL;
+				client_to_server.opaque = Z_NULL;
 
-					int i, j;
-					int count = 0;
+				if (inflateInit(&client_to_server) != Z_OK) {
+					fprintf(stderr, "Failure to inflateInit on client side.\n");
+					exit(1);
+				}
 
-					for(i = 0, j = 0; i < res; i++) {
-						if(buffer[i] == 0x04){
-							end_loop = 1;
-						} else if(buffer[i] == '\n'){ 
-							if(comp_flag) {
-								char out_buf[256];
-								int out_len = 256;
+				break;
 
-								compress_stream(&to_client, (buffer+j), count, out_buf, out_len);
-								write(socket_fd, out_buf, out_len - to_client.avail_out);
+			default:
+				fprintf(stderr, "Error in arguments.\n");
+				exit(1); 
+				break;
+		}
+	}
 
-								char out_buf2[256];
-								int out_len2 = 256;
+	if (!port_flag) {
+		fprintf(stderr, "--port= option is mandatory.\n");
+		exit(1);
+	}
 
-								compress_stream(&to_client, rn, 2, out_buf2, out_len2);
-								write(socket_fd, out_buf2, out_len2 - to_client.avail_out);
-								j += count + 1;
-								count = 0;
-							} else {
-								if((write(socket_fd, rn, sizeof(char)*2)) < 0) {
-									fprintf(stderr, "Writing to socket failed. Error: %d\n", errno);
-									exit(1);
-								}
+	/* Create a socket */
+
+	unsigned int client_size;
+	struct sockaddr_in server_address, client_address;
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "Failure to create socket in server program.\n");
+		exit(1);
+	}
+
+	memset( (void *) &server_address, 0, sizeof(server_address));
+	server_address.sin_family = AF_INET;
+	server_address.sin_addr.s_addr = INADDR_ANY;
+	server_address.sin_port = htons(portno);
+	if (bind(sock, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) {
+		fprintf(stderr, "Error with binding.\n");
+		exit(1);
+	}
+	listen(sock, 8);
+	client_size = sizeof(client_address);
+	if ((sock2 = accept(sock, (struct sockaddr *) &client_address, &client_size)) < 0) {
+		fprintf(stderr, "Error with accepting.\n");
+		exit(1);
+	}
+
+	//create pipes
+	if (pipe(pipe_ctop) != 0) {
+		fprintf(stderr, "Failed to create pipe from terminal to shell.\n");
+		exit(1);
+	}
+	if (pipe(pipe_ptoc) != 0) {
+		fprintf(stderr, "Failed to create pipe from shell to terminal.\n");
+		exit(1);
+	}
+
+	signal(SIGPIPE, handle_sigpipe);
+
+	pid = fork();
+
+	if (pid == 0) { //child (shell) process
+		close(pipe_ptoc[1]); //write end from parent to child
+		close(pipe_ctop[0]); //read end from child to parent
+
+		/* replace STDIN, STDOUT, and STDERR with pipes */
+		dup2(pipe_ptoc[0], STDIN_FILENO); //read from parent to child
+		dup2(pipe_ctop[1], STDOUT_FILENO); //write from child to parent
+		dup2(pipe_ctop[1], STDERR_FILENO);
+
+		close(pipe_ptoc[0]);
+		close(pipe_ctop[1]);
+
+		/* exec a shell /bin/bash with no arguments other than its name */
+		char *arguments[2];
+		char filename[] = "/bin/bash";
+		arguments[0] = filename;
+		arguments[1] = NULL;
+
+		if (execvp(filename, arguments) == -1) {
+			fprintf(stderr, "Failed to exec a shell.\n");
+			exit(1);
+		}
+
+		/* The shell will automatically read from the pipe and execute. */
+
+	} else if (pid > 0) { //parent (terminal) process
+
+		close(pipe_ptoc[0]); //read end from parent to child
+		close(pipe_ctop[1]); //write end from child to parent
+
+		struct pollfd descriptors[] = {
+			{sock2, POLLIN, 0}, //socket
+			{pipe_ctop[0], POLLIN, 0} //output from shell
+		};
+			
+		int EOT_flag = 0;
+		int i;
+
+		int status;
+		while (!EOT_flag) {
+
+			if (waitpid (pid, &status, WNOHANG) != 0) {
+				close(sock);
+				close(sock2);
+				close(pipe_ctop[0]);
+				close(pipe_ptoc[1]);
+				fprintf(stderr, "SHELL EXIT SIGNAL=%d STATUS=%d\n", WIFSIGNALED(status), WEXITSTATUS(status));
+				exit(0);
+			}
+
+			if (poll(descriptors, 2, 0) > 0) {
+
+				short revents_socket = descriptors[0].revents;
+				short revents_shell = descriptors[1].revents;
+
+				/* check that socket has pending input */
+				if (revents_socket == POLLIN) {
+					char input[256];
+					int num = read(sock2, &input, 256);
+
+					if (compress_flag) {
+						//decompress
+						//fprintf(stderr, "server decompressing data\n");
+						char compression_buf[1024];
+						client_to_server.avail_in = num;
+						client_to_server.next_in = (unsigned char *) input;
+						client_to_server.avail_out = 1024;
+						client_to_server.next_out = (unsigned char *) compression_buf;
+
+						do {
+							inflate(&client_to_server, Z_SYNC_FLUSH);
+						} while (client_to_server.avail_in > 0);
+
+						for (i = 0; (unsigned int) i < 1024 - client_to_server.avail_out; i++) {
+							if (compression_buf[i] == ETX) {
+								kill(pid, SIGINT); 
+							} else if (compression_buf[i] == EOT) {
+							    EOT_flag = 1;
+							} else if (compression_buf[i] == CR || compression_buf[i] == LF) { 
+								char lf = LF;
+								write(pipe_ptoc[1], &lf, 1);
+							} else { 
+								write(pipe_ptoc[1], (compression_buf + i), 1);
 							}
-						} else {
-							if(comp_flag) {
-								count++;
-							} else {
-								if((write(socket_fd, &buffer[i], sizeof(char))) < 0) {
-									fprintf(stderr, "Writing to socket failed. Error: %d\n", errno);
-									exit(1);
-								}
+						}
+
+					} else {
+						//no compress option
+						for (i = 0; i < num; i++) {
+							if (input[i] == ETX) {
+								kill(pid, SIGINT); 
+							} else if (input[i] == EOT) {
+							    EOT_flag = 1;
+							} else if (input[i] == CR || input[i] == LF) { 
+								char lf = LF;
+								write(pipe_ptoc[1], &lf, 1);
+							} else { 
+								write(pipe_ptoc[1], (input + i), 1);
 							}
 						}
 					}
 
-					if(comp_flag) {
-						char out_buf[256];
-						int out_len = 256;
+				} else if (revents_socket == POLLERR) {
+					fprintf(stderr, "Error with poll from socket.\n");
+					exit(1);
+				}
 
-						compress_stream(&to_client, (buffer+j), count, out_buf, out_len);
-						write(socket_fd, out_buf, out_len - to_client.avail_out);
+				/* check that the shell has pending input */
+				if (revents_shell == POLLIN) {
+					char input[256];
+					int num = read(pipe_ctop[0], &input, 256); 
+
+					int count = 0;
+					int j;
+					for (i = 0, j = 0; i < num; i++) {
+						if (input[i] == EOT) { //EOF from shell
+							EOT_flag = 1;
+
+						} else if (input[i] == LF) {
+
+							if (compress_flag) {
+								//fprintf(stderr, "server compressing data\n");
+								//compress
+								char compression_buf[256];
+								server_to_client.avail_in = count;
+								server_to_client.next_in = (unsigned char *) (input + j);
+								server_to_client.avail_out = 256;
+								server_to_client.next_out = (unsigned char *) compression_buf;
+
+								do {
+									deflate(&server_to_client, Z_SYNC_FLUSH);
+								} while (server_to_client.avail_in > 0);
+
+								write(sock2, compression_buf, 256 - server_to_client.avail_out);
+
+								//compress crlf
+								char compression_buf2[256];
+								char crlf_copy[2] = {CR, LF};
+								server_to_client.avail_in = 2;
+								server_to_client.next_in = (unsigned char *) (crlf_copy);
+								server_to_client.avail_out = 256;
+								server_to_client.next_out = (unsigned char *) compression_buf2;
+
+								do {
+									deflate(&server_to_client, Z_SYNC_FLUSH);
+								} while (server_to_client.avail_in > 0);
+
+								write(sock2, compression_buf2, 256 - server_to_client.avail_out);
+
+							} else {
+								//no compress option
+								write(sock2, (input + j), count);
+								write(sock2, crlf, 2);
+							}
+
+							j += count + 1;
+							count = 0;
+							continue;
+						}
+						count++;
 					}
-				} else if (pollfds[1].revents & (POLLERR | POLLHUP)) {
-					close(from_shell[0]);
-					end_loop = 1;
+
+					//compress 
+					write(sock2, (input+j), count);		
+
+				} else if (revents_shell & POLLERR || revents_shell & POLLHUP) { //polling error
+					EOT_flag = 1;
 				} 
 			} 
 		}
-	} else {
-		fprintf(stderr, "Fork failed\n");
+
+		close(sock);
+		close(sock2);
+		close(pipe_ctop[0]);
+		close(pipe_ptoc[1]);
+		shell_exit_status();
+
+	} else { //fork failed
+		fprintf(stderr, "Could not fork process.\n");
 		exit(1);
 	}
+
+	if (compress_flag) {
+		inflateEnd(&client_to_server);
+		deflateEnd(&server_to_client);
+	}
 	exit(0);
-	return 0;
 }

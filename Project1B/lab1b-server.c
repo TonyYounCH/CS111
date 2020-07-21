@@ -127,10 +127,6 @@ void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void *
 }
 
 void at_exit_signal(){
-	//shutdown(new_socket_fd, SHUT_RDWR);
-	int status;
-	waitpid(pid, &status, 0);
-	fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));
 	close(socket_fd);
 }
 

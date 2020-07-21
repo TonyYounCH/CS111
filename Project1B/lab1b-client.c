@@ -4,7 +4,6 @@ EMAIL: tonyyoun2@gmail.com
 ID: 304207830
 */
 
-
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -12,6 +11,7 @@ ID: 304207830
 #include <stdlib.h>
 #include <getopt.h>
 #include <termios.h>
+#include <assert.h>
 #include <poll.h>
 #include <string.h>
 #include <sys/types.h>

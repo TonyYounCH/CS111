@@ -86,7 +86,7 @@ int server_connect(unsigned int port_num) {
 			exit(1);
 			continue;
 		} else {
-			// close(sockfd);
+			close(sockfd);
 			break;
 		}
 	}

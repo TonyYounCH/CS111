@@ -33,9 +33,12 @@ ID: 304207830
 #define COMP 'c'
 
 struct termios saved_original;
-
+int socket_fd;
+int lfd;
 
 void restore(void) {
+	close(socket_fd);
+	close(lfd);
 	tcsetattr(0, TCSANOW, &saved_original);
 }
 
@@ -115,8 +118,6 @@ int main(int argc, char* argv[]) {
 		{"compress", 0, NULL, COMP},
 		{0, 0, 0, 0}
 	};
-	int socket_fd;
-	int lfd;
 	int port_no = 0;
 	int mandatory = 0;
 	int log_flag = 0;

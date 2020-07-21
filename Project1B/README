@@ -2,50 +2,54 @@ NAME: Changhui Youn
 EMAIL: tonyyoun2@gmail.com
 ID: 304207830
 
-Project1A is divided into two main parts :
-	- Teminal
-	- Shell
+Project1B is divided into two main parts :
+	- Passing input and output over a TCP socket
+	- Compressing communication between the client and server
 
-For the terminal part, I am to set STDIN into non-canonical input that
-input is available character-at-a-time. 
-(c_iflag = ISTRIP, c_oflag = 0, c_lflag = 0;)
+lab1b-client.c and lab1b-server.c are implemented so that they can communicate
+over TCP/IP socket.
 
-By default, the terminal is set to canonical mode, and it must be saved using
-tcgetattr(0, &saved_original) function. 
-This saved mode will be used to restore the setting at exit.
-When all set, if read <cr> or <lf> it outputs <cr><lf> to stdout.
-Also when EOF(^D) recieved, exit the program and restore to normal mode.
+##################
+# lab1b-client.c #
+##################
 
-For the second part(SHELL), I allow the program to accept --shell=program 
-argument. When this argument is set, it will allow to fork another process
-and let it execute received program (in this case /bin/bash).
+Client accpets three options : --port, --log, --compress
 
-I forward the stdin of the parent process to the stdin of the child process and 
-forward the stdout/stderr of the child process to the stdout of the parent 
-process.
+It starts with non-canonical terminal as Project1A and receives input
+from STDIN and send input to TCP socket while echoing to the display.
 
-This is done using pipe. I created two pipefds(pipe to shell and pipe from shell) and allow each pipe to read or write to/from shell.
+When --log option is given, it writes whatever data it is receiving/sending to log file description.
 
-For the child process, STDIN is dup to_shell pipe read and STDOUT/STDERR are dup to from_shell write. 
+When --compress option is given, it compresses/decompresses the input/output data to/from the socket using zlib library.
 
-For the parent process, it must read from STDIN(0) and from_shell[0] then write to STDOUT and to_shell[1]. 
 
-This might cause problem of read being blocked forever. In order to resolve this
-issue, poll API is used. 
+##################
+# lab1b-server.c #
+##################
 
-Using poll, it reacts to whatever poll events and read/write according to 
-the input. 
+Server accpets three options : --port, --shell, --compress
 
-When ^C is received, parent process kills its child by sending SIGINT signal.
-kill(pid, SIGINT);
+It starts with creating two pipes(to_shell, from_shell) then create child process
+that will execute shell using fork(). Server reads data from TCP/IP socket and
+send data to shell using to_shell pipe. Then shell reads data from to_shell pipe and sends data using from_shell pipe. Then parent process reads data from from_shell pipe.
+
+When --shell option is given, child process execute whatever program that --shell
+option specified. If --shell is not give, it automatically uses /bin/bash as default.
+
+When --compress option is given, it compresses/decompresses the input/output data to/from the socket using zlib library.
+
 
 Makefile
-default : create executable file
+
+default : create executable files(server and client)
+server	: create server executable file
+client	: create client executable file
 dist	: create tarball
 clean	: remove all files created by Makefile
 
 README
-Descriptions on Project1A
+
+Descriptions on Project1B
 
 Reference
-Skeleton code from Discussion 1B. 
+Skeleton code from Discussion 1A/B. 

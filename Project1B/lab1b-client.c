@@ -198,11 +198,9 @@ int main(int argc, char* argv[]) {
 					write(socket_fd, out_buf, out_len - to_server.avail_out);
 
 					if (log_flag) {
-						char sent[32];
-						sprintf(sent, "%d", out_len - to_server.avail_out);
-						dprintf(lfd, "SENT %lu bytes: ", strlen(sent));
-						write(lfd, out_buf, out_len - to_server.avail_out);
-						write(lfd, &rn[1], 1);
+						dprintf(lfd, "SENT %d bytes: ", out_len - to_server.avail_out);
+						write(lfd, (char*) out_buf, out_len - to_server.avail_out);
+						write(lfd, &rn[1], sizeof(char));
 					}
 
 				} else {
@@ -213,9 +211,8 @@ int main(int argc, char* argv[]) {
 					if (log_flag) {
 						// Log
 						dprintf(lfd, "SENT %d bytes: ", res);
-						write(lfd, &buffer, res);
+						write(lfd, buffer, res);
 						write(lfd, &rn[1], sizeof(char));
-
 					}
 				}
 			} else if(pollfds[0].revents & POLLHUP){
@@ -255,7 +252,7 @@ int main(int argc, char* argv[]) {
 				if(log_flag){
 					// Log
 					dprintf(lfd, "RECEIVED %d bytes: ", res);
-					write(lfd, &buffer, res);
+					write(lfd, (char*) buffer, res);
 					write(lfd, &rn[1], sizeof(char));
 
 				}

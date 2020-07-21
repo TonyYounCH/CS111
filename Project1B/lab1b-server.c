@@ -144,6 +144,8 @@ void harvest()
 		comp_end();
 	}
 	close(socket_fd);
+	close(from_shell[0]);
+	close(to_shell[1]);
 	int status;
 	waitpid(pid, &status, 0);
 	fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));

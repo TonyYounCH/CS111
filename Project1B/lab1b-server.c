@@ -7,23 +7,20 @@ ID: 304207830
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
-#include <getopt.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <getopt.h>
+#include <termios.h>
+#include <poll.h>
+#include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <assert.h>
-#include <stdbool.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <poll.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <netdb.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
-#include <string.h>
+#include <netdb.h>
 #include "zlib.h"
 
 #define PORT 'p'

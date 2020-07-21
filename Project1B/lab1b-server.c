@@ -367,6 +367,5 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "Fork failed\n");
 		exit(1);
 	}
-
-	return;
+	return 0;
 }

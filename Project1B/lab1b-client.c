@@ -31,12 +31,15 @@ struct termios saved_original;
 int socket_fd;
 int lfd;
 
+// This function restores terminal state to its normal state
 void restore(void) {
 	close(socket_fd);
 	close(lfd);
 	tcsetattr(0, TCSANOW, &saved_original);
 }
 
+// This function sets up the terminal to non-canonical mode 
+// and saves the normal state
 void terminal_setup(void) {
 	struct termios tmp;
 	tcgetattr(0, &saved_original);
@@ -47,7 +50,8 @@ void terminal_setup(void) {
 	tcsetattr(0, TCSANOW, &tmp);
 }
 
-
+// Create TCP/IP socket and connects to server with the socket with given
+// hostname and port number
 int client_connect(char* hostname, unsigned int port) {
 	int sockfd;
 	struct sockaddr_in serv_addr;
@@ -73,6 +77,7 @@ int client_connect(char* hostname, unsigned int port) {
 	return sockfd;
 }
 
+// This inits compress stream
 void init_compress_stream (z_stream * stream) {
 	stream->zalloc = Z_NULL, stream-> zfree = Z_NULL, stream-> opaque = Z_NULL;
 	if (deflateInit(stream, Z_DEFAULT_COMPRESSION) != Z_OK) {
@@ -81,6 +86,7 @@ void init_compress_stream (z_stream * stream) {
 	}
 }
 
+// This inits decompress stream
 void init_decompress_stream (z_stream * stream) {
 	stream->zalloc = Z_NULL, stream-> zfree = Z_NULL, stream-> opaque = Z_NULL;
 	if (inflateInit(stream) != Z_OK) {
@@ -89,6 +95,8 @@ void init_decompress_stream (z_stream * stream) {
 	}
 }
 
+
+// deflate until all orinal buffer has no more data in it
 void compress_stream (z_stream * stream, void * orig_buf, int orig_len, void * out_buf, int out_len) {
 	stream->next_in = orig_buf, stream->avail_in = orig_len;
 	stream->next_out = out_buf, stream->avail_out = out_len;
@@ -97,6 +105,7 @@ void compress_stream (z_stream * stream, void * orig_buf, int orig_len, void * o
 	} while (stream->avail_in > 0);
 }
 
+// inflate until all orinal buffer has no more data in it
 void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void * out_buf, int out_len) {
 	stream->next_in = orig_buf, stream->avail_in = orig_len;
 	stream->next_out = out_buf, stream->avail_out = out_len;
@@ -127,10 +136,12 @@ int main(int argc, char* argv[]) {
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
 			case PORT: 
+				// set port# to given number
 				port_no = atoi(optarg);
 				mandatory = 1;
 				break;
 			case LOG: 
+				// set log flag
 				log_flag = 1;
 				if ((lfd = creat(optarg, 0666)) < 0) {
 					fprintf(stderr, "--log=filename failed to create/write to file\n");
@@ -138,11 +149,13 @@ int main(int argc, char* argv[]) {
 				}
 				break;
 			case COMP: 
+				// set compression flag and initialize two streams
 				comp_flag = 1;
 				init_compress_stream(&to_server);
 				init_decompress_stream(&from_server);
 				break;
 			default:
+				// invalid argument is given
 				fprintf(stderr, "Invalid argument(s)\nYou may use --port=port# (mandatory), --log=filename, or --compress only.\n");
 				exit(1);
 				break;
@@ -156,6 +169,7 @@ int main(int argc, char* argv[]) {
 	//set the terminal to the non-canonical, no echo mode
 	terminal_setup();
 
+	// create connection to TCP/IP socket
 	socket_fd = client_connect(hostname, port_no);
 
 
@@ -194,6 +208,8 @@ int main(int argc, char* argv[]) {
 					char out_buf[256];
 					int out_len = 256;
 
+					// Compress original buffer to out_buf and write the compressed
+					// data into socket_fd
 					compress_stream(&to_server, buffer, res, out_buf, out_len);
 					write(socket_fd, out_buf, out_len - to_server.avail_out);
 
@@ -204,6 +220,7 @@ int main(int argc, char* argv[]) {
 					}
 
 				} else {
+					// No need to compress
 					if((write(socket_fd, buffer, res)) < 0) {
 						fprintf(stderr, "Writing to SOCKET failed. Error: %d\n", errno);
 						exit(1);
@@ -239,6 +256,8 @@ int main(int argc, char* argv[]) {
 					char out_buf[1024];
 					int out_len = 1024;
 
+					// Deompress original buffer to out_buf and write the compressed
+					// data into STDOUT
 					decompress_stream(&from_server, buffer, res, out_buf, out_len);
 					write(1, out_buf, out_len - from_server.avail_out);
 

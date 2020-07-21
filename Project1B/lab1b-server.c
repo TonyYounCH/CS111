@@ -37,6 +37,7 @@ int comp_flag = 0;
 z_stream to_client;
 z_stream from_client;
 
+// This function handles signal received (SIGPIPE)
 void signal_handler(int sig){
 	if(sig == SIGPIPE){
 		fprintf(stderr, "SIGPIPE received!");
@@ -48,6 +49,9 @@ void signal_handler(int sig){
 	}
 }
 
+
+// Create TCP/IP socket and connects to client with the socket with given
+// port number
 int server_connect(unsigned int port_num) {
 	int sockfd, new_fd;
 	struct sockaddr_in my_addr;
@@ -93,7 +97,7 @@ int server_connect(unsigned int port_num) {
 	return new_fd;
 }
 
-
+// This inits compress stream
 void init_compress_stream (z_stream * stream) {
 	stream->zalloc = Z_NULL, stream-> zfree = Z_NULL, stream-> opaque = Z_NULL;
 	if (deflateInit(stream, Z_DEFAULT_COMPRESSION) != Z_OK) {
@@ -102,6 +106,7 @@ void init_compress_stream (z_stream * stream) {
 	}
 }
 
+// This inits decompress stream
 void init_decompress_stream (z_stream * stream) {
 	stream->zalloc = Z_NULL, stream-> zfree = Z_NULL, stream-> opaque = Z_NULL;
 	if (inflateInit(stream) != Z_OK) {
@@ -110,6 +115,7 @@ void init_decompress_stream (z_stream * stream) {
 	}
 }
 
+// deflate until all orinal buffer has no more data in it
 void compress_stream (z_stream * stream, void * orig_buf, int orig_len, void * out_buf, int out_len) {
 
 	stream->next_in = orig_buf, stream->avail_in = orig_len;
@@ -119,6 +125,7 @@ void compress_stream (z_stream * stream, void * orig_buf, int orig_len, void * o
 	} while (stream->avail_in > 0);
 }
 
+// inflate until all orinal buffer has no more data in it
 void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void * out_buf, int out_len) {
 	stream->next_in = orig_buf, stream->avail_in = orig_len;
 	stream->next_out = out_buf, stream->avail_out = out_len;
@@ -127,8 +134,8 @@ void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void *
 	} while (stream->avail_in > 0);
 }
 
-void harvest()
-{	
+// harvest the shell's completion/termination reports
+void harvest() {	
 	if(comp_flag) {
 		deflateEnd(&to_client);
 		inflateEnd(&from_client);
@@ -158,19 +165,23 @@ int main(int argc, char* argv[]) {
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
 			case PORT: 
+				// set port# to given number
 				port_no = atoi(optarg);
 				mandatory = 1;
 				break;
 			case SHELL: 
+				// shell program is set to given program
 				program = optarg;
 				break;
 			case COMP: 
+				// set compression flag and initialize two streams
 				comp_flag = 1;
 				init_compress_stream(&to_client);
 				init_decompress_stream(&from_client);
 
 				break;
 			default:
+				// invalid argument is given
 				fprintf(stderr, "Invalid argument(s)\nYou may use --port=port# (mandatory), --shell=program, or --compress only.\n");
 				exit(1);
 				break;
@@ -230,6 +241,8 @@ int main(int argc, char* argv[]) {
 		
 		while (!end_loop) {
 			if((poll(pollfds, 2, -1)) > 0) {
+
+				//if input from client
 				if(pollfds[0].revents == POLLIN) {
 					char buffer[256];
 					int res = read(socket_fd, &buffer, 256);
@@ -239,6 +252,9 @@ int main(int argc, char* argv[]) {
 					}
 
 					if (comp_flag) {
+						// When compression flag is set, the incoming data must be decompressed
+						// Decompress the data to out_buf and send decompressed data to shell
+						// using pipe to_shell
 						char out_buf[1024];
 						int out_len = 1024;
 						decompress_stream(&from_client, buffer, res, out_buf, out_len);
@@ -263,17 +279,22 @@ int main(int argc, char* argv[]) {
 							}
 						}
 					} else {
+						// If no compression flag, function behaves normally and sends
+						// whatever incoming input to shell using pipe to_shell
 						int i;
 						for(i = 0; i < res; i++) {
+							// if cr or nl, send newline to shell
 							if(buffer[i] == '\r' || buffer[i] == '\n'){ 
 								if((write(to_shell[1], &rn[1], sizeof(char))) < 0) {
 									fprintf(stderr, "Writing to SHELL failed. Error: %d\n", errno);
 									exit(1);
 								}
 							} else if(buffer[i] == 0x04){
+								// if ^D close the shell pipe and exit
 								close(to_shell[1]);
 								end_loop = 1;
 							} else if(buffer[i] == 0x03){
+								// if ^C kill child process
 								kill(pid, SIGINT);
 							} else { 
 								if((write(to_shell[1], &buffer[i], sizeof(char))) < 0) {
@@ -293,6 +314,7 @@ int main(int argc, char* argv[]) {
 					exit(1);
 				}
 
+				// if input from shell 
 				if(pollfds[1].revents == POLLIN) {
 					char buffer[256];
 					int res = read(from_shell[0], &buffer, 256);
@@ -301,20 +323,23 @@ int main(int argc, char* argv[]) {
 						exit(1);
 					}
 
-					int i, j;
-					int count = 0;
+					int i;
+					int j;			// next starting index of buffer
+					int count = 0;	// length of buffer that needs to be compressed before nl
 
 					for(i = 0, j = 0; i < res; i++) {
 						if(buffer[i] == 0x04){
 							end_loop = 1;
 						} else if(buffer[i] == '\n'){ 
 							if(comp_flag) {
+								// compress data
 								char out_buf[256];
 								int out_len = 256;
 
 								compress_stream(&to_client, (buffer+j), count, out_buf, out_len);
 								write(socket_fd, out_buf, out_len - to_client.avail_out);
 
+								// compress nl
 								char out_buf2[256];
 								int out_len2 = 256;
 

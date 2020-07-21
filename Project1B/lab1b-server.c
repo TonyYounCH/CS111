@@ -349,7 +349,7 @@ int main(int argc, char* argv[]) {
 						}
 					}
 
-					if(count > 0) {
+					if(comp_flag) {
 						char out_buf[256];
 						int out_len = 256;
 

@@ -36,6 +36,7 @@ int from_shell[2];
 int to_shell[2];
 int pid;
 int socket_fd;
+int comp_flag = 0;
 z_stream to_client;
 z_stream from_client;
 
@@ -135,6 +136,18 @@ void comp_end(){
 	inflateEnd(&from_client);
 }
 
+void harvest()
+{	
+	if(comp_flag) {
+		comp_end();
+	}
+	close(socket_fd);
+	int status;
+	waitpid(pid, &status, 0);
+	fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));
+	exit(0);
+}
+
 int main(int argc, char* argv[]) {
 	struct option options[] = {
 		{"port", 1, NULL, PORT},
@@ -145,7 +158,6 @@ int main(int argc, char* argv[]) {
 
 	int port_no = 0;
 	int mandatory = 0;
-	int comp_flag = 0;
 	char rn[2] = {'\r', '\n'};
 	char* program = "/bin/bash";
 
@@ -221,10 +233,7 @@ int main(int argc, char* argv[]) {
 
 		int end_loop = 0;
 
-		atexit(at_exit_signal);
-		if(comp_flag){
-			atexit(comp_end);	
-		}
+		atexit(harvest);
 		
 		while (!end_loop) {
 			if((poll(pollfds, 2, -1)) > 0) {
@@ -354,18 +363,13 @@ int main(int argc, char* argv[]) {
 			} 
 		}
 
-		close(socket_fd);
-		int status;
-		waitpid(pid, &status, 0);
-		fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));
-		exit(0);
 	} else {
 		fprintf(stderr, "Fork failed\n");
 		exit(1);
 	}
 
 
-	if (comp_flag) {
-		comp_end();
-	}
+	// if (comp_flag) {
+	// 	comp_end();
+	// }
 }

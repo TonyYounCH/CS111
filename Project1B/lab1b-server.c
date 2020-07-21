@@ -48,7 +48,7 @@ int server_connect(unsigned int port_num) {
 	int sockfd, new_fd;
 	struct sockaddr_in my_addr;
 	struct sockaddr_in their_addr;
-	int sin_size;
+	unsigned int sin_size;
 
 	// sock
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
@@ -137,7 +137,6 @@ int main(int argc, char* argv[]) {
 	int socket_fd;
 	int port_no = 0;
 	int mandatory = 0;
-	int shell_flag = 0;
 	int comp_flag = 0;
 	char rn[2] = {'\r', '\n'};
 	char* program = "/bin/bash";
@@ -150,7 +149,6 @@ int main(int argc, char* argv[]) {
 				mandatory = 1;
 				break;
 			case SHELL: 
-				shell_flag = 1;
 				program = optarg;
 				break;
 			case COMP: 

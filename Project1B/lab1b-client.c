@@ -122,7 +122,6 @@ int main(int argc, char* argv[]) {
 	int log_flag = 0;
 	int comp_flag = 0;
 	char rn[2] = {'\r', '\n'};
-	int logWrite;
 	char* hostname = "localhost";
 
 	z_stream to_server;
@@ -217,9 +216,9 @@ int main(int argc, char* argv[]) {
 					}
 					if (log_flag) {
 						// Log
-						logWrite = dprintf(lfd, "SENT %d bytes: ", res);
-						logWrite = write(lfd, &buffer, res);
-						logWrite = write(lfd, &rn[1], sizeof(char));
+						dprintf(lfd, "SENT %d bytes: ", res);
+						write(lfd, &buffer, res);
+						write(lfd, &rn[1], sizeof(char));
 
 					}
 				}

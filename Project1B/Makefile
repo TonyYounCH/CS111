@@ -3,14 +3,14 @@
 # ID: 304207830
 
 default:
-	gcc -Wall -Wextra -lz -o lab1b-client lab1b-client.c
-	gcc -Wall -Wextra -lz -o lab1b-server lab1b-server.c
+	/usr/local/cs/bin/gcc -g -Wall -Wextra lab1b-client.c -o lab1b-client
+	/usr/local/cs/bin/gcc -g -Wall -Wextra lab1b-server.c -o lab1b-server
 
 client:
-	gcc -Wall -Wextra -lz -o lab1b-client lab1b-client.c
+	/usr/local/cs/bin/gcc -g -Wall -Wextra lab1b-client.c -o lab1b-client
 
 server: 
-	gcc -Wall -Wextra -lz -o lab1b-server lab1b-server.c
+	/usr/local/cs/bin/gcc -g -Wall -Wextra lab1b-server.c -o lab1b-server
 
 clean:
 	rm -f *.o lab1b-client lab1b-server *.txt *.tar.gz

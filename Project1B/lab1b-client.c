@@ -202,9 +202,9 @@ int main(int argc, char* argv[]) {
 					write(socket_fd, out_buf, out_len - to_server.avail_out);
 
 					if (log_flag) {
-						char num_bytes[32];
-						sprintf(num_bytes, "%d", out_len - to_server.avail_out);
-						dprintf(lfd, "SENT %lu bytes: ", strlen(num_bytes));
+						char sent[32];
+						sprintf(sent, "%d", out_len - to_server.avail_out);
+						dprintf(lfd, "SENT %lu bytes: ", strlen(sent));
 						write(lfd, out_buf, out_len - to_server.avail_out);
 						write(lfd, &rn[1], 1);
 					}

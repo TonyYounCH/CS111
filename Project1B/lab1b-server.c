@@ -35,6 +35,9 @@ struct termios saved_original;
 int from_shell[2];
 int to_shell[2];
 int pid;
+int socket_fd;
+z_stream to_client;
+z_stream from_client;
 
 void signal_handler(int sig){
 	if(sig == SIGPIPE){
@@ -123,6 +126,19 @@ void decompress_stream (z_stream * stream, void * orig_buf, int orig_len, void *
 	} while (stream->avail_in > 0);
 }
 
+void at_exit_signal(){
+	//shutdown(new_socket_fd, SHUT_RDWR);
+	int status;
+	waitpid(pid, &status, 0);
+	fprintf(stderr, "\r\nSHELL EXIT SIGNAL=%d STATUS=%d\r\n", WTERMSIG(status), WEXITSTATUS(status));
+	close(socket_fd);
+}
+
+void comp_end(){
+	deflateEnd(&to_client);
+	inflateEnd(&from_client);
+}
+
 int main(int argc, char* argv[]) {
 	struct option options[] = {
 		{"port", 1, NULL, PORT},
@@ -131,10 +147,6 @@ int main(int argc, char* argv[]) {
 		{0, 0, 0, 0}
 	};
 
-	z_stream to_client;
-	z_stream from_client;
-
-	int socket_fd;
 	int port_no = 0;
 	int mandatory = 0;
 	int comp_flag = 0;
@@ -213,6 +225,11 @@ int main(int argc, char* argv[]) {
 
 		int end_loop = 0;
 
+		atexit(at_exit_signal);
+		if(comp_flag){
+			atexit(comp_end);	
+		}
+		
 		while (!end_loop) {
 			if((poll(pollfds, 2, -1)) > 0) {
 				if(pollfds[0].revents == POLLIN) {
@@ -353,7 +370,6 @@ int main(int argc, char* argv[]) {
 
 
 	if (comp_flag) {
-		inflateEnd(&from_client);
-		deflateEnd(&to_client);
+		comp_end();
 	}
 }

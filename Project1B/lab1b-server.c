@@ -45,6 +45,8 @@ void signal_handler(int sig){
 		fprintf(stderr, "SIGPIPE received!");
 		close(from_shell[0]);
 		exit(0);
+	} else if(sig == SIGINT) {
+		kill(pid, SIGINT);
 	}
 }
 

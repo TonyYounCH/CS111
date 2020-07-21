@@ -39,8 +39,8 @@ void terminal_setup(void) {
 }
 
 void signal_handler(int sig){
-    if(sig == SIGPIPE){
-    	fprintf(stderr, "SIGPIPE received!");
+	if(sig == SIGPIPE){
+		fprintf(stderr, "SIGPIPE received!");
 		close(from_shell[0]);
 		exit(0);
 	}

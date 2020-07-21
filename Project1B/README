@@ -1,0 +1,51 @@
+NAME: Changhui Youn
+EMAIL: tonyyoun2@gmail.com
+ID: 304207830
+
+Project1A is divided into two main parts :
+	- Teminal
+	- Shell
+
+For the terminal part, I am to set STDIN into non-canonical input that
+input is available character-at-a-time. 
+(c_iflag = ISTRIP, c_oflag = 0, c_lflag = 0;)
+
+By default, the terminal is set to canonical mode, and it must be saved using
+tcgetattr(0, &saved_original) function. 
+This saved mode will be used to restore the setting at exit.
+When all set, if read <cr> or <lf> it outputs <cr><lf> to stdout.
+Also when EOF(^D) recieved, exit the program and restore to normal mode.
+
+For the second part(SHELL), I allow the program to accept --shell=program 
+argument. When this argument is set, it will allow to fork another process
+and let it execute received program (in this case /bin/bash).
+
+I forward the stdin of the parent process to the stdin of the child process and 
+forward the stdout/stderr of the child process to the stdout of the parent 
+process.
+
+This is done using pipe. I created two pipefds(pipe to shell and pipe from shell) and allow each pipe to read or write to/from shell.
+
+For the child process, STDIN is dup to_shell pipe read and STDOUT/STDERR are dup to from_shell write. 
+
+For the parent process, it must read from STDIN(0) and from_shell[0] then write to STDOUT and to_shell[1]. 
+
+This might cause problem of read being blocked forever. In order to resolve this
+issue, poll API is used. 
+
+Using poll, it reacts to whatever poll events and read/write according to 
+the input. 
+
+When ^C is received, parent process kills its child by sending SIGINT signal.
+kill(pid, SIGINT);
+
+Makefile
+default : create executable file
+dist	: create tarball
+clean	: remove all files created by Makefile
+
+README
+Descriptions on Project1A
+
+Reference
+Skeleton code from Discussion 1B. 

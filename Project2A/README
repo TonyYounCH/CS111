@@ -88,7 +88,15 @@ graphs	: run tests and gnuplot file lab2_add.gp and lab2_list.gp
 dist	: create tarball
 clean	: remove all files created by Makefile except .png and .csv
 
-README
+##################
+#    tests.sh    #
+##################
+
+Tests script that runs all tests for lab2_add and lab2_list
+
+##################
+#     README     #
+##################
 
 Descriptions on Project2A and answers
 

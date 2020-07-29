@@ -2,86 +2,167 @@ NAME: Changhui Youn
 EMAIL: tonyyoun2@gmail.com
 ID: 304207830
 
-Project1B is divided into two main parts :
-	- Passing input and output over a TCP socket
-	- Compressing communication between the client and server
-
-lab1b-client.c and lab1b-server.c are implemented so that they can communicate
-over TCP/IP socket.
-
-##################
-# lab1b-client.c #
-##################
-
-Client accpets three options : --port, --log, --compress
-
-It starts with non-canonical terminal as Project1A and receives input
-from STDIN and send input to TCP socket while echoing to the display.
-
-When --log option is given, it writes whatever data it is receiving/sending to log file description.
-
-When --compress option is given, it compresses/decompresses the input/output data to/from the socket using zlib library.
+Project2A is divided into two main parts :
+	- Writing multithreaded application that performs parallel updates to a 
+	shared variable
+	- Writing a multithreaded application that performs parallel updates to
+	a sorted doubly linked list data structure
 
 
 ##################
-# lab1b-server.c #
+#   lab2_add.c   #
 ##################
 
-Server accpets three options : --port, --shell, --compress
+lab2_add accpets four options : --threads=#, --iterations=#, --yield, --sync=[m,s,c]
 
-It starts with creating two pipes(to_shell, from_shell) then create child process
-that will execute shell using fork(). Server reads data from TCP/IP socket and
-send data to shell using to_shell pipe. Then shell reads data from to_shell pipe and sends data using from_shell pipe. Then parent process reads data from from_shell pipe.
+It processes arguments and retrieve threads and iterations numbers to create 
+threads. Based on yield and sync option, threads will perform addtion to shared
+variable wrapped with mutex lock, spin lock or compare_and_swap. 
+After all operations are done, it will print out :
 
-When --shell option is given, child process execute whatever program that --shell
-option specified. If --shell is not give, it automatically uses /bin/bash as default.
+test, threads, iterations, num_operations, run_time, avg_per_op, counter
 
-When --compress option is given, it compresses/decompresses the input/output data to/from the socket using zlib library.
+##################
+#  lab2_list.c   #
+##################
+
+lab2_add accpets four options : --threads=#, --iterations=#, --yield=[idl], --sync=[m,s]
+
+It processes arguments and retrieve threads and iterations numbers to create 
+threads. Based on yield and sync option, threads will perform insert/delete/lookup to doubly linked list wrapped with mutex lock or spin lock. 
+After all operations are done, it will print out :
+
+test, threads, iterations, list, num_operations, run_time, avg_per_op
 
 
-Makefile
+##################
+#  SortedList.c  #
+##################
 
-build	: 
-tests	: 
-graphs	: 
+Implement all four methods described in SortedList header file. Interface includes three software-conterolled yield options. 
+Identify the critical section in each of four methods and add calls to pthread_yield or sched_yield, controlled by the yield options:
+
+in SortedList_insert if opt_yield & INSERT_YIELD
+in SortedList_delete if opt_yield & DELETE_YIELD
+in SortedList_lookup if opt_yield & LOOKUP_YIELD
+in SortedList_length if opt_yield & LOOKUP_YIELD
+
+#################
+#     Graph     #
+#################
+
+	lab2_add-1.png : threads and iterations required to generate a failure (with and without yields)
+
+	lab2_add-2.png : average time per operation with and without yields.
+
+	lab2_add-3.png : average time per (single threaded) operation vs. the number of iterations.
+
+	lab2_add-4.png : threads and iterations that can run successfully with yields under each of the synchronization options.
+
+	lab2_add-5.png : average time per (protected) operation vs. the number of threads.
+
+	lab2_list-1.png : average time per (single threaded) unprotected operation vs. number of iterations (illustrating the correction of the per-operation cost for the list length).
+
+	lab2_list-2.png : threads and iterations required to generate a failure (with and without yields).
+
+	lab2_list-3.png : iterations that can run (protected) without failure.
+
+	lab2_list-4.png : (length-adjusted) cost per operation vs the number of threads for the various synchronization options.
+
+#################
+#      CSV      #
+#################
+
+	lab2_add.csv : containing all of results for all of the Part-1 tests.
+
+	lab2_list.csv : containing all of results for all of the Part-2 tests.
+
+
+##################
+#    Makefile    #
+##################
+
+build	: create two executables lab2_add and lab2_list
+tests	: builds and run tests.sh script and gets lab2_add.csv and lab2_list.csv
+graphs	: run tests and gnuplot file lab2_add.gp and lab2_list.gp
 dist	: create tarball
-clean	: remove all files created by Makefile
+clean	: remove all files created by Makefile except .png and .csv
 
 README
 
-Descriptions on Project1B and answers
+Descriptions on Project2A and answers
 
 QUESTIONS
 
 QUESTION 2.1.1 - causing conflicts:
 
-	Why does it take many iterations before errors are seen?
+	Q : Why does it take many iterations before errors are seen?
 
-	If there are many iterations, it will take more than thread's time slice
+	A : If there are many iterations, it will take more than thread's time slice
 	to finish its work and get interrupted. When interrupted, the race condition
 	error will happen casuing the resulting value to be inconsistent.
 
-	Why does a significantly small number of iterations so seldom fail?
+	Q : Why does a significantly small number of iterations so seldom fail?
 
-	With a small number of iterations, the thread is likely to finish its job
-	within its time slice, thus not interrupted. 
+	A : With a small number of iterations, the thread is likely to finish its job within its time slice, thus not interrupted. 
 
 QUESTION 2.1.2 - cost of yielding:
 
-	Why are the --yield runs so much slower?
+	Q : Why are the --yield runs so much slower?
+	
+	A : Because it takes some time to interrupt and switch to another thread
 
-	Where is the additional time going?
+	Q : Where is the additional time going?
 
-	Is it possible to get valid per-operation timings if we are using the --yield option?
+	A : Switching between threads
 
-	If so, explain how. If not, explain why not
+	Q : Is it possible to get valid per-operation timings if we are using the --yield option?
+
+	A : It is not possible, since extra time that is not related to operation will be added to timing. 
 
 QUESTION 2.1.3 - measurement errors:
 	
-	Why does the average cost per operation drop with increasing iterations?
+	Q : Why does the average cost per operation drop with increasing iterations?
 
-	If the cost per iteration is a function of the number of iterations, how do we know how many iterations to run (or what the "correct" cost is)?
+	A : Since iterations compensate for the overhead that occurs from creating a new thread. 
 
+	Q : If the cost per iteration is a function of the number of iterations, how do we know how many iterations to run (or what the "correct" cost is)?
 
-Reference
+	A : To find what the "correct" cost is, we can keep increasing the number of iterations until it reachs some level of stability.  
+
+QUESTION 2.1.4 - costs of serialization
+
+	Q : Why do all of the options perform similarly for low numbers of threads?
+
+	A : If there are low numbers of threads, there will be low contention for a resource which leads to less time spent waiting for a lock. If there is less overhead, they perform well and similarly.
+
+	Q : Why do the three protected operations slow down as the number of threads rises?
+
+	A : For each protected operations whether they use mutex, spin-lock or compare and swap, threads will have to wait for a resource to be released causing more overhead. This slows down the performance.
+
+QEUSTION 2.2.1 - scalability of Mutex
+
+	Q : Compare the variation in time per mutex-protected operation vs the number of threads in Part-1 (adds) and Part-2 (sorted lists).
+	Comment on the general shapes of the curves, and explain why they have this shape
+
+	A : As the number of threads increases, cost per operation seems to increase in both Part 1 and Part 2 since the contention for the resources rises.
+
+	Q : Comment on the relative rates of increase and differences in the shapes of the curves, and offer an explanation for these differences.
+
+	A : The rate of increase in Part 2 is larger than Part 1 because Part2  has more operations (insert, delete, lookup) compared to Part 1 (Add) which lead threads to spend more time waiting.
+
+QUESTION 2.2.2 - scalability of spin locks
+
+	Q : Compare the variation in time per protected operation vs the number of threads for list operations protected by Mutex vs Spin locks. 
+	Comment on the general shapes of the curves, and explain why they have this shape
+
+	A : As number of threads increases, cost per operations protected by Mutex and Spin locks both increases since the contention for the resources rises.
+
+	Q : Comment on the relative rates of increase and differences in the shapes of the curves, and offer an explanation for these differences.
+
+	A : The rate of increase in spin locks is larger than that in mutex. This is because, spin lock forces thread to wait for the resource for its entire time cycle where mutex puts threads into sleep while waiting. 
+
+Reference 
+
 Skeleton code from Discussion 1A/B. 
+https://stackoverflow.com/questions/15767691/whats-the-c-library-function-to-generate-random-string

@@ -21,7 +21,7 @@ done
 # add-yield-none
 for i in 1, 2, 4, 8, 12
 do
-	for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
+	for j in 100, 1000, 10000, 100000
 	do
 		./lab2_add --threads=$i --iterations=$j --yield >> lab2_add.csv
 	done

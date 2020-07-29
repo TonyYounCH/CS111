@@ -38,26 +38,29 @@ int spin_lock = 0;
 char test[16] = "list-";
 char* str_yield = NULL;
 
-void getTestName(){
-    if(str_yield == NULL){
-        str_yield = "none";
-    }
-    strcat(test, str_yield);
-    if(opt_sync == 'm'){
-        strcat(test, "-m");
-    }
-    else if(opt_sync == 's'){
-        strcat(test, "-s");
-    }
-    else {
-        strcat(test, "-none");
-    }
+// This function sets test string based on str_yield and opt_sync
+void set_test(){
+	if(str_yield == NULL){
+		str_yield = "none";
+	}
+	strcat(test, str_yield);
+	if(opt_sync == 'm'){
+		strcat(test, "-m");
+	}
+	else if(opt_sync == 's'){
+		strcat(test, "-s");
+	}
+	else {
+		strcat(test, "-none");
+	}
 }
 
 void * thread_worker(void* arg) {
 	int i;
 	unsigned long num = *((unsigned long*) arg);
 	for(i = num; i < num_elements; i += threads){
+		// SortedList_insert is critical section and it is
+		// wrapped with mutex lock or spin_lock based on opt_sync
 		if(opt_sync == 'm') {
 			pthread_mutex_lock(&mutex);
 		} else if(opt_sync == 's') {
@@ -72,6 +75,8 @@ void * thread_worker(void* arg) {
 	}
 
 	int length = 0;
+	// SortedList_length is critical section and it is
+	// wrapped with mutex lock or spin_lock based on opt_sync
 	if(opt_sync == 'm') {
 		pthread_mutex_lock(&mutex);
 	} else if(opt_sync == 's') {
@@ -91,22 +96,24 @@ void * thread_worker(void* arg) {
 	SortedListElement_t *element;
 
 	for (i = num; i < num_elements; i += threads) {
+		// SortedList_lookup and SortedList_delete are critical section
+		// and they are wrapped with mutex lock or spin_lock based on opt_sync
 		if(opt_sync == 'm') {
 			pthread_mutex_lock(&mutex);
 		} else if(opt_sync == 's') {
 			while(__sync_lock_test_and_set(&spin_lock, 1));
 		} 
-    	element = SortedList_lookup(head, pool[i].key);
-    	if (element == NULL) {
-    		fprintf(stderr, "Failure to look up element\n");
-    		exit(2);
-    	}
+		element = SortedList_lookup(head, pool[i].key);
+		if (element == NULL) {
+			fprintf(stderr, "Failure to look up element\n");
+			exit(2);
+		}
 
 		int n = SortedList_delete(element);
-    	if (n != 0) {
-    		fprintf(stderr, "Failure to delete element\n");
-    		exit(2);
-    	}
+		if (n != 0) {
+			fprintf(stderr, "Failure to delete element\n");
+			exit(2);
+		}
 		if(opt_sync == 'm') {
 			pthread_mutex_unlock(&mutex);
 		} else if(opt_sync == 's') {
@@ -117,24 +124,28 @@ void * thread_worker(void* arg) {
 }
 
 void signal_handler(int sigNum){
+	// handles segmentation fault
 	if(sigNum == SIGSEGV){
 		fprintf(stderr, "Segmentation fault caught!\n");
 		exit(2);
 	}
-}//signal handler for SIGSEGV
+}
 
 
 char* rand_key(){
+	// generates randome string
+	// ref : https://stackoverflow.com/questions/15767691/whats-the-c-library-function-to-generate-random-string
 	char* random_key = (char*) malloc(sizeof(char)*10);
 	int i;
 	for (i=0; i<9; i++){
-		random_key[i] = rand()%72 + '0';
+		random_key[i] = '0' + rand()%72;
 	}
 	random_key[9] = '\0';
 	return random_key;
 }
 
 
+// This function initialize pool with num_elements
 void init_elem(int num_elements) {
 	int i;
 	// seed rand()
@@ -167,12 +178,15 @@ int main(int argc, char *argv[]) {
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
 			case THREAD: 
+				// get threads #
 				threads = atoi(optarg);
 				break;
 			case ITER:
+				// get iteration #
 				iterations = atoi(optarg);
 				break;
 			case YIELD:
+				// get opt_yield and given string
 				for (i = 0; i < (ssize_t) strlen(optarg); i++) {
 					if (optarg[i] == 'i') {
 						opt_yield |= INSERT_YIELD;
@@ -209,10 +223,12 @@ int main(int argc, char *argv[]) {
 
 	num_elements = threads * iterations;
 
+	// head is currently empty and needs initialization
 	head = (SortedList_t*) malloc(sizeof(SortedList_t));
 	head->prev = head;
 	head->next = head;
 	head->key = NULL;
+	// 
 	pool = (SortedListElement_t*) malloc(sizeof(SortedListElement_t)*num_elements);
 	init_elem(num_elements);
 
@@ -223,11 +239,11 @@ int main(int argc, char *argv[]) {
 	} 
 
 	pthread_t *thread = malloc((sizeof(pthread_t) * threads));
-	int thread_id[threads];
+	// int thread_id[threads];
 
 	for(i = 0; i < threads; i++) {
-		thread_id[i] = i;
-		if(pthread_create(&thread[i], NULL, thread_worker, &thread_id[i]) < 0){
+		// thread_id[i] = i;
+		if(pthread_create(&thread[i], NULL, thread_worker, &i) < 0){
 			fprintf(stderr, "Thread creation failed\n");
 			exit(1);
 		}
@@ -245,17 +261,17 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-    if(SortedList_length(head) != 0){
-        fprintf(stderr, "Length of list is not 0\n");
-        exit(2);
-    }
+	if(SortedList_length(head) != 0){
+		fprintf(stderr, "Length of list is not 0\n");
+		exit(2);
+	}
 
 	long num_operations = threads * iterations * 3;
 	long run_time = SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
 	long avg_per_op = run_time/num_operations;
 
 	// print corresponding data
-	getTestName();
+	set_test();
 	print_csv(threads, iterations, 1, num_operations, run_time, avg_per_op);
 	if(opt_sync == 'm')
 		pthread_mutex_destroy(&mutex);

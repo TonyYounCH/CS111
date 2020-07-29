@@ -29,6 +29,7 @@ long threads;
 long iterations;
 int spin_lock = 0;
 
+// This is critical section that adds given value
 void add(long long *pointer, long long value) {
 	long long sum = *pointer + value;
 	if(opt_yield)
@@ -36,27 +37,25 @@ void add(long long *pointer, long long value) {
 	*pointer = sum;
 }
 
+// This function handles critical section based on opt_sync
 void task(unsigned long iter, int val){
 	unsigned long i = 0;
 	if(opt_sync == 'm'){
 		for(i=0; i < iter; i++) {
+			// mutex lock
 			pthread_mutex_lock(&mutex);
 			add(&counter, val);
 			pthread_mutex_unlock(&mutex);
 		}
 	} else if (opt_sync == 's') {
 		for(i=0; i < iter; i++) {
+			// spin lock
 			while(__sync_lock_test_and_set(&spin_lock, 1));
 			add(&counter, val);
 			__sync_lock_release(&spin_lock);
 		}
 	} else if (opt_sync == 'c') {
-		for(i=0; i < iter; i++) {
-			pthread_mutex_lock(&mutex);
-			add(&counter, val);
-			pthread_mutex_unlock(&mutex);
-		}
-		
+		// compare and swap
 		long long old;
 		do {
 			old = counter;
@@ -73,6 +72,7 @@ void task(unsigned long iter, int val){
 }
 
 void* thread_worker(void* arg) {
+	// add 1 and subtract 1 so that it evens out
 	unsigned long iter = *((unsigned long*) arg);
 	task(iter, 1);
 	task(iter, -1);
@@ -103,12 +103,15 @@ int main(int argc, char *argv[]) {
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
 			case THREAD: 
+				// get threads #
 				threads = atoi(optarg);
 				break;
 			case ITER:
+				// get iteration #
 				iterations = atoi(optarg);
 				break;
 			case YIELD:
+				// Does it yield?
 				opt_yield = 1;
 				break;
 			case SYNC:
@@ -139,12 +142,14 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	} 
 	for(i = 0; i < threads; i++) {
+		// create threads with worker function
 		if(pthread_create(&thread[i], NULL, thread_worker, &iterations) < 0){
 			fprintf(stderr, "Thread creation failed\n");
 			exit(1);
 		}
 	}
 	for(i = 0; i < threads; i++) {
+		// join threads
 		if(pthread_join(thread[i], NULL) < 0){
 			fprintf(stderr, "Thread creation failed\n");
 			exit(1);

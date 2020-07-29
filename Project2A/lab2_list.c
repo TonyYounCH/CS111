@@ -239,11 +239,11 @@ int main(int argc, char *argv[]) {
 	} 
 
 	pthread_t *thread = malloc((sizeof(pthread_t) * threads));
-	// int thread_id[threads];
+	int thread_id[threads];
 
 	for(i = 0; i < threads; i++) {
-		// thread_id[i] = i;
-		if(pthread_create(&thread[i], NULL, thread_worker, &i) < 0){
+		thread_id[i] = i;
+		if(pthread_create(&thread[i], NULL, thread_worker, &thread_id[i]) < 0){
 			fprintf(stderr, "Thread creation failed\n");
 			exit(1);
 		}

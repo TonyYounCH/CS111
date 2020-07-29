@@ -23,19 +23,36 @@ ID: 304207830
 
 #define SEC_TO_NSEC 1000000000L
 
-SortedList_t head;
+SortedList_t* head;
 SortedListElement_t* pool;
 
-int opt_yield;
-int opt_yield;
-char opt_sync;
-long threads;
-long iterations;
-long num_elements;
+int opt_yield = 0;
+char opt_sync = 0;
+long threads = 1;
+long iterations = 1;
+long num_elements = 0;
 
 pthread_mutex_t mutex;
 int spin_lock = 0;
 
+char test[32] = "list-";
+char* yieldOpts = NULL;
+
+void getTestName(){
+    if(yieldOpts == NULL){
+        yieldOpts = "none";
+    }
+    strcat(test, yieldOpts);
+    if(opt_sync == 'm'){
+        strcat(test, "-m");
+    }
+    else if(opt_sync == 's'){
+        strcat(test, "-s");
+    }
+    else {
+        strcat(test, "-none");
+    }
+}
 
 void * thread_worker(void* arg) {
 	int i;
@@ -46,7 +63,7 @@ void * thread_worker(void* arg) {
 		} else if(opt_sync == 's') {
 			while(__sync_lock_test_and_set(&spin_lock, 1));
 		} 
-		SortedList_insert(&head, &pool[i]);
+		SortedList_insert(head, &pool[i]);
 		if(opt_sync == 'm') {
 			pthread_mutex_unlock(&mutex);
 		} else if(opt_sync == 's') {
@@ -60,7 +77,7 @@ void * thread_worker(void* arg) {
 	} else if(opt_sync == 's') {
 		while(__sync_lock_test_and_set(&spin_lock, 1));
 	} 
-	length = SortedList_length(&head);
+	length = SortedList_length(head);
 	if (length < 0) {
 		fprintf(stderr, "Failed to read length\n");
 		exit(2);
@@ -79,7 +96,7 @@ void * thread_worker(void* arg) {
 		} else if(opt_sync == 's') {
 			while(__sync_lock_test_and_set(&spin_lock, 1));
 		} 
-    	element = SortedList_lookup(&head, pool[i].key);
+    	element = SortedList_lookup(head, pool[i].key);
     	if (element == NULL) {
     		fprintf(stderr, "Failure to look up element\n");
     		exit(2);
@@ -135,7 +152,7 @@ void init_elem(int num_elements) {
 }
 
 void print_csv(long threads, long iterations, long val, long num_operations, long run_time, long avg_per_op){
-	fprintf(stdout, ",%ld,%ld,%ld,%ld,%ld,%ld\n", threads, iterations, val, num_operations, run_time, avg_per_op);
+	fprintf(stdout, "%s,%ld,%ld,%ld,%ld,%ld,%ld\n", test, threads, iterations, val, num_operations, run_time, avg_per_op);
 }
 
 int main(int argc, char *argv[]) {
@@ -163,6 +180,8 @@ int main(int argc, char *argv[]) {
 				iterations = atoi(optarg);
 				break;
 			case YIELD:
+				yieldOpts = (char*) malloc(sizeof(char)*6);
+				yieldOpts = strdup(optarg);
 				for (i = 0; i < (ssize_t) strlen(optarg); i++) {
 					if (optarg[i] == 'i') {
 						opt_yield |= INSERT_YIELD;
@@ -196,7 +215,15 @@ int main(int argc, char *argv[]) {
 	signal(SIGSEGV, signal_handler);
 
 	num_elements = threads * iterations;
-	pool = malloc(sizeof(SortedListElement_t) * num_elements);
+	// pool = malloc(sizeof(SortedListElement_t) * num_elements);
+	// init_elem(num_elements);
+
+	head = (SortedList_t*) malloc(sizeof(SortedList_t));
+	head->prev = head;
+	head->next = head;
+	head->key = NULL;
+	pool = (SortedListElement_t*) malloc(sizeof(SortedListElement_t)*num_elements);
+	srand((unsigned int) time(NULL)); //must use srand before rand
 	init_elem(num_elements);
 
 	struct timespec begin, end;
@@ -206,8 +233,11 @@ int main(int argc, char *argv[]) {
 	} 
 
 	pthread_t *thread = malloc((sizeof(pthread_t) * threads));
+	int thread_id[threads];
+
 	for(i = 0; i < threads; i++) {
-		if(pthread_create(&thread[i], NULL, thread_worker, &threads) < 0){
+		thread_id[i] = i;
+		if(pthread_create(&thread[i], NULL, thread_worker, &thread_id[i]) < 0){
 			fprintf(stderr, "Thread creation failed\n");
 			exit(1);
 		}
@@ -225,7 +255,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-    if(SortedList_length(pool) != 0){
+    if(SortedList_length(head) != 0){
         fprintf(stderr, "Length of list is not 0\n");
         exit(2);
     }
@@ -235,49 +265,7 @@ int main(int argc, char *argv[]) {
 	long avg_per_op = run_time/num_operations;
 
 	// print corresponding data
-  	fprintf(stdout, "list");
-	switch(opt_yield) {
-		case 0:
-			fprintf(stdout, "-none");
-			break;
-		case 1:
-			fprintf(stdout, "-i");
-			break;
-		case 2:
-			fprintf(stdout, "-d");
-			break;
-		case 3:
-			fprintf(stdout, "-id");
-			break;
-		case 4:
-			fprintf(stdout, "-l");
-			break;
-		case 5:
-			fprintf(stdout, "-il");
-			break;
-		case 6:
-			fprintf(stdout, "-dl");
-			break;
-		case 7:
-			fprintf(stdout, "-idl");
-			break;
-		default:
-			break;
-	}
-	  
-	switch(opt_sync) {
-		case 0:
-			fprintf(stdout, "-none");
-			break;
-		case 's':
-			fprintf(stdout, "-s");
-			break;
-		case 'm':
-			fprintf(stdout, "-m");
-			break;
-		default:
-			break;
-	}
+	getTestName();
 	print_csv(threads, iterations, 1, num_operations, run_time, avg_per_op);
 	if(opt_sync == 'm')
 		pthread_mutex_destroy(&mutex);

@@ -35,14 +35,14 @@ long num_elements = 0;
 pthread_mutex_t mutex;
 int spin_lock = 0;
 
-char test[32] = "list-";
-char* yieldOpts = NULL;
+char test[16] = "list-";
+char* str_yield = NULL;
 
 void getTestName(){
-    if(yieldOpts == NULL){
-        yieldOpts = "none";
+    if(str_yield == NULL){
+        str_yield = "none";
     }
-    strcat(test, yieldOpts);
+    strcat(test, str_yield);
     if(opt_sync == 'm'){
         strcat(test, "-m");
     }
@@ -116,15 +116,6 @@ void * thread_worker(void* arg) {
 	return NULL;
 }
 
-void list_remove(SortedListElement_t* element) {
-	SortedListElement_t* n = element->next; //say n = 0x1234	
-	SortedListElement_t* p = element->prev;	
-	n->prev = p;
-	p->next = n;
-	element->next = NULL;
-	element->prev = NULL;
-}
-
 void signal_handler(int sigNum){
 	if(sigNum == SIGSEGV){
 		fprintf(stderr, "Segmentation fault caught!\n");
@@ -137,15 +128,17 @@ char* rand_key(){
 	char* random_key = (char*) malloc(sizeof(char)*10);
 	int i;
 	for (i=0; i<9; i++){
-		random_key[i] = (char) rand()%26 + 'a';
+		random_key[i] = rand()%72 + '0';
 	}
 	random_key[9] = '\0';
 	return random_key;
-}//https://stackoverflow.com/questions/19724346/generate-random-characters-in-c generating random characters in C
+}
 
 
 void init_elem(int num_elements) {
 	int i;
+	// seed rand()
+	srand(time(NULL));
 	for (i = 0; i < num_elements; i++) {
 		pool[i].key = rand_key();
 	}
@@ -180,8 +173,6 @@ int main(int argc, char *argv[]) {
 				iterations = atoi(optarg);
 				break;
 			case YIELD:
-				yieldOpts = (char*) malloc(sizeof(char)*6);
-				yieldOpts = strdup(optarg);
 				for (i = 0; i < (ssize_t) strlen(optarg); i++) {
 					if (optarg[i] == 'i') {
 						opt_yield |= INSERT_YIELD;
@@ -194,6 +185,8 @@ int main(int argc, char *argv[]) {
 						exit(1);
 					}
 				}
+				str_yield = (char*) malloc(sizeof(char)*5);
+				str_yield = optarg;
 				break;
 			case SYNC:
 				if(strlen(optarg) != 1) {
@@ -223,7 +216,6 @@ int main(int argc, char *argv[]) {
 	head->next = head;
 	head->key = NULL;
 	pool = (SortedListElement_t*) malloc(sizeof(SortedListElement_t)*num_elements);
-	srand((unsigned int) time(NULL)); //must use srand before rand
 	init_elem(num_elements);
 
 	struct timespec begin, end;

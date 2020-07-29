@@ -208,8 +208,6 @@ int main(int argc, char *argv[]) {
 	signal(SIGSEGV, signal_handler);
 
 	num_elements = threads * iterations;
-	// pool = malloc(sizeof(SortedListElement_t) * num_elements);
-	// init_elem(num_elements);
 
 	head = (SortedList_t*) malloc(sizeof(SortedList_t));
 	head->prev = head;

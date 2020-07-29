@@ -9,76 +9,74 @@ rm -f lab2_list.csv
 touch lab2_add.csv
 touch lab2_list.csv
 
-#add-none test
+# add-none
 for i in 1, 2, 4, 8, 12
 do
-    for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-    do
-        ./lab2_add --iterations=$j --threads=$i >> lab2_add.csv
-    done
+	for j in 100, 1000, 10000, 100000
+	do
+		./lab2_add --threads=$i --iterations=$j >> lab2_add.csv
+	done
 done
 
-#add-yield-none test
+# add-yield-none
 for i in 1, 2, 4, 8, 12
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --yield >> lab2_add.csv
-        done
+	for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
+	do
+		./lab2_add --threads=$i --iterations=$j --yield >> lab2_add.csv
+	done
 done
 
-#add-m test
-for i in 1, 2, 4, 8, 12
+# compare the average execution time
+for i in 2, 8
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --sync=m >> lab2_add.csv
-        done
+	for j in 100, 1000, 10000, 100000
+	do
+		./lab2_add --threads=$i --iterations=$j >> lab2_add.csv
+	done
+done
+for i in 2, 8
+do
+	for j in 100, 1000, 10000, 100000
+	do
+		./lab2_add --threads=$i --iterations=$j --yield >> lab2_add.csv
+	done
 done
 
-#add-s test
-for i in 1, 2, 4, 8, 12
+# add-yield-m
+for i in 2, 4, 8, 12
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --sync=s >> lab2_add.csv
-        done
+	./lab2_add --threads=$i --iterations=10000 --yield --sync=m >> lab2_add.csv
 done
 
-#add-c test
-for i in 1, 2, 4, 8, 12
+# add-yield-c
+for i in 2, 4, 8, 12
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --sync=c >> lab2_add.csv
-        done
+	./lab2_add --threads=$i --iterations=10000 --yield --sync=c >> lab2_add.csv
 done
 
-#add-yield-m test
-for i in 1, 2, 4, 8, 12
+# add-yield-s
+for i in 2, 4, 8, 12
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --yield --sync=m >> lab2_add.csv
-        done
+	./lab2_add --threads=$i --iterations=1000 --yield --sync=s >> lab2_add.csv
 done
 
-#add-yield-s test
+# add-m
 for i in 1, 2, 4, 8, 12
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --yield --sync=s >> lab2_add.csv
-        done
+	./lab2_add --threads=$i --iterations=10000 --sync=m >> lab2_add.csv
 done
 
-#add-yield-c test
+# add-c
 for i in 1, 2, 4, 8, 12
 do
-        for j in 10, 20, 40, 80, 100, 1000, 10000, 100000
-        do
-                ./lab2_add --iterations=$j --threads=$i --yield --sync=c >> lab2_add.csv
-        done
+	./lab2_add --threads=$i --iterations=10000 --sync=c >> lab2_add.csv
+done
+
+# add-s
+for i in 1, 2, 4, 8, 12
+do
+	./lab2_add --threads=$i --iterations=10000 --sync=s >> lab2_add.csv
 done
 
 

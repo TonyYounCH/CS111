@@ -3,8 +3,6 @@
 # ID: 304207830
 
 build:
-	#/usr/local/cs/bin/gcc -g -Wall -Wextra lab1b-client.c -lz -o lab1b-client
-	#
 	gcc -g -Wall -Wextra -lpthread lab2_add.c -o lab2_add
 	gcc -g -Wall -Wextra -lpthread lab2_list.c SortedList.c -o lab2_list
 

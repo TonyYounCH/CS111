@@ -1,25 +1,24 @@
-Total: 406 samples
-     311  76.6%  76.6%      406 100.0% thread_worker
-      16   3.9%  80.5%       16   3.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:204
-      12   3.0%  83.5%       12   3.0% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-      10   2.5%  86.0%       53  13.1% SortedList_insert
-      10   2.5%  88.4%       42  10.3% SortedList_lookup
-       9   2.2%  90.6%        9   2.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:203
-       5   1.2%  91.9%        5   1.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:206
-       5   1.2%  93.1%        5   1.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-       4   1.0%  94.1%        4   1.0% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:161
-       4   1.0%  95.1%        4   1.0% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:212
-       4   1.0%  96.1%        4   1.0% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-       3   0.7%  96.8%        3   0.7% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:165
-       3   0.7%  97.5%        3   0.7% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:205
-       3   0.7%  98.3%        3   0.7% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1733
-       3   0.7%  99.0%        3   0.7% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-       2   0.5%  99.5%        2   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:211
-       2   0.5% 100.0%        2   0.5% _init
-       0   0.0% 100.0%      406 100.0% ?? /usr/src/debug////////glibc-2.17-c758a686/misc/../sysdeps/unix/sysv/linux/x86_64/clone.S:118
-       0   0.0% 100.0%      406 100.0% start_thread
+Total: 648 samples
+     560  86.4%  86.4%      648 100.0% thread_worker
+      15   2.3%  88.7%       15   2.3% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:204
+      14   2.2%  90.9%       14   2.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+      12   1.9%  92.7%       12   1.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:203
+      11   1.7%  94.4%       51   7.9% SortedList_insert
+       7   1.1%  95.5%        7   1.1% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:211
+       6   0.9%  96.5%       36   5.6% SortedList_lookup
+       5   0.8%  97.2%        5   0.8% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       5   0.8%  98.0%        5   0.8% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       3   0.5%  98.5%        3   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:165
+       3   0.5%  98.9%        3   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:212
+       3   0.5%  99.4%        3   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       1   0.2%  99.5%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:161
+       1   0.2%  99.7%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:205
+       1   0.2%  99.8%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:206
+       1   0.2% 100.0%        1   0.2% SortedList_length
+       0   0.0% 100.0%      648 100.0% ?? /usr/src/debug////////glibc-2.17-c758a686/misc/../sysdeps/unix/sysv/linux/x86_64/clone.S:118
+       0   0.0% 100.0%      648 100.0% start_thread
 ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/Project2B/lab2_list.c
-   311    406 Total samples (flat / cumulative)
+   560    648 Total samples (flat / cumulative)
      .      .   61: int hashkey(const char* key) {
      .      .   62: 	// a simple hash of the key modulo the nuber of lists
      .      .   63: 	return key[0] % num_list;
@@ -50,13 +49,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .   87: 				fprintf(stderr, "Gettime error\n");
      .      .   88: 				exit(1);
      .      .   89: 			} 
-   243    243   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   305    305   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .   91: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .   92: 				fprintf(stderr, "Gettime error\n");
      .      .   93: 				exit(1);
      .      .   94: 			}
      .      .   95: 		} 
-     .     53   96: 		SortedList_insert(&listheads[hash], &pool[i]);
+     .     51   96: 		SortedList_insert(&listheads[hash], &pool[i]);
      .      .   97: 		if(opt_sync == 'm') {
      .      .   98: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
      .      .   99: 			pthread_mutex_unlock(&mutexes[hash]);
@@ -85,13 +84,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  122: 				fprintf(stderr, "Gettime error\n");
      .      .  123: 				exit(1);
      .      .  124: 			} 
-     .      .  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+     2      2  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
      .      .  126: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  127: 				fprintf(stderr, "Gettime error\n");
      .      .  128: 				exit(1);
      .      .  129: 			}
      .      .  130: 		} 
-     .      .  131: 		length = SortedList_length(&listheads[i]);
+     .      1  131: 		length = SortedList_length(&listheads[i]);
      .      .  132: 		if (length < 0) {
      .      .  133: 			fprintf(stderr, "Failed to read length\n");
      .      .  134: 			exit(2);
@@ -126,13 +125,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  163: 				fprintf(stderr, "Gettime error\n");
      .      .  164: 				exit(1);
      .      .  165: 			} 
-    68     68  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   253    253  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .  167: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  168: 				fprintf(stderr, "Gettime error\n");
      .      .  169: 				exit(1);
      .      .  170: 			}
      .      .  171: 		} 
-     .     42  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
+     .     36  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
      .      .  173: 		if (element == NULL) {
      .      .  174: 			fprintf(stderr, "Failure to look up element\n");
      .      .  175: 			exit(2);
@@ -160,7 +159,7 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  196: 	if(sigNum == SIGSEGV){
      .      .  197: 		fprintf(stderr, "Segmentation fault caught!\n");
 ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/Project2B/lab2_list.c
-   311    406 Total samples (flat / cumulative)
+   560    648 Total samples (flat / cumulative)
      .      .   61: int hashkey(const char* key) {
      .      .   62: 	// a simple hash of the key modulo the nuber of lists
      .      .   63: 	return key[0] % num_list;
@@ -191,13 +190,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .   87: 				fprintf(stderr, "Gettime error\n");
      .      .   88: 				exit(1);
      .      .   89: 			} 
-   243    243   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   305    305   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .   91: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .   92: 				fprintf(stderr, "Gettime error\n");
      .      .   93: 				exit(1);
      .      .   94: 			}
      .      .   95: 		} 
-     .     53   96: 		SortedList_insert(&listheads[hash], &pool[i]);
+     .     51   96: 		SortedList_insert(&listheads[hash], &pool[i]);
      .      .   97: 		if(opt_sync == 'm') {
      .      .   98: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
      .      .   99: 			pthread_mutex_unlock(&mutexes[hash]);
@@ -226,13 +225,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  122: 				fprintf(stderr, "Gettime error\n");
      .      .  123: 				exit(1);
      .      .  124: 			} 
-     .      .  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+     2      2  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
      .      .  126: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  127: 				fprintf(stderr, "Gettime error\n");
      .      .  128: 				exit(1);
      .      .  129: 			}
      .      .  130: 		} 
-     .      .  131: 		length = SortedList_length(&listheads[i]);
+     .      1  131: 		length = SortedList_length(&listheads[i]);
      .      .  132: 		if (length < 0) {
      .      .  133: 			fprintf(stderr, "Failed to read length\n");
      .      .  134: 			exit(2);
@@ -267,13 +266,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  163: 				fprintf(stderr, "Gettime error\n");
      .      .  164: 				exit(1);
      .      .  165: 			} 
-    68     68  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   253    253  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .  167: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  168: 				fprintf(stderr, "Gettime error\n");
      .      .  169: 				exit(1);
      .      .  170: 			}
      .      .  171: 		} 
-     .     42  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
+     .     36  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
      .      .  173: 		if (element == NULL) {
      .      .  174: 			fprintf(stderr, "Failure to look up element\n");
      .      .  175: 			exit(2);

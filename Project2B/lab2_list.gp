@@ -7,7 +7,7 @@
 # purpose:
 #	 generate data reduction graphs for the multi-threaded list project
 #
-# input: lab2_list.csv
+# input: lab2b_list.csv
 #	1. test name
 #	2. # threads
 #	3. # iterations per thread
@@ -46,9 +46,9 @@ set output 'lab2b_1.png'
 
 # grep out only single threaded, un-protected, non-yield results
 plot \
-	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title 'w Mutex' with linespoints lc rgb 'red', \
-	 "< grep 'list-none-s,[0-9]*,1000,1,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-s,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title 'w Spin-Lock' with linespoints lc rgb 'green'
 
 
@@ -61,9 +61,9 @@ set logscale y 10
 set output 'lab2b_2.png'
 # note that unsuccessful runs should have produced no output
 plot \
-	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2_list.csv" using ($2):($8) \
+	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($8) \
 	title 'wait-for-lock time' with points lc rgb 'red', \
-	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2_list.csv" using ($2):($7) \
+	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($7) \
 	title 'average time per operation' with points lc rgb 'green'
 	 
 set title "Successful Iterations vs. Threads for each Synchronization Method"
@@ -75,11 +75,11 @@ set logscale y 10
 set output 'lab2b_3.png'
 # note that unsuccessful runs should have produced no output
 plot \
-	"< grep 'list-id-none,[0-9]*,[0-9]*,4,' lab2_list.csv" using ($2):($3) \
+	"< grep 'list-id-none,[0-9]*,[0-9]*,4,' lab2b_list.csv" using ($2):($3) \
 	title 'no synchronization' with points lc rgb 'red', \
-	"< grep 'list-id-m,[0-9]*,[0-9]*,4,' lab2_list.csv" using ($2):($3) \
+	"< grep 'list-id-m,[0-9]*,[0-9]*,4,' lab2b_list.csv" using ($2):($3) \
 	title 'mutex protected' with points lc rgb 'green', \
-	"< grep 'list-id-s,[0-9]*,[0-9]*,4,' lab2_list.csv" using ($2):($3) \
+	"< grep 'list-id-s,[0-9]*,[0-9]*,4,' lab2b_list.csv" using ($2):($3) \
 	title 'spinlock protected' with points lc rgb 'blue'
 #
 # "no valid points" is possible if even a single iteration can't run
@@ -94,13 +94,13 @@ set logscale y 10
 set output 'lab2b_4.png'
 # note that unsuccessful runs should have produced no output
 plot \
-	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '1-list' with points lc rgb 'red', \
-	 "< grep 'list-none-m,[0-9]*,1000,4,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-m,[0-9]*,1000,4,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '4-lists' with points lc rgb 'green', \
-	 "< grep 'list-none-m,[0-9]*,1000,8,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-m,[0-9]*,1000,8,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '8-lists' with points lc rgb 'blue', \
-	 "< grep 'list-none-m,[0-9]*,1000,16,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-m,[0-9]*,1000,16,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '16-lists' with points lc rgb 'violet'
 
 
@@ -113,12 +113,12 @@ set logscale y 10
 set output 'lab2b_4.png'
 # note that unsuccessful runs should have produced no output
 plot \
-	 "< grep 'list-none-s,[0-9]*,1000,1,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-s,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '1-list' with points lc rgb 'red', \
-	 "< grep 'list-none-s,[0-9]*,1000,4,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-s,[0-9]*,1000,4,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '4-lists' with points lc rgb 'green', \
-	 "< grep 'list-none-s,[0-9]*,1000,8,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-s,[0-9]*,1000,8,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '8-lists' with points lc rgb 'blue', \
-	 "< grep 'list-none-s,[0-9]*,1000,16,' lab2_list.csv" using ($2):(1000000000/($7)) \
+	 "< grep 'list-none-s,[0-9]*,1000,16,' lab2b_list.csv" using ($2):(1000000000/($7)) \
 	title '16-lists' with points lc rgb 'violet'
 	

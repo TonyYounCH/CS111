@@ -1,443 +1,386 @@
-//NAME: Luca Matsumoto
-//ID: 204726167
-//EMAIL: lucamatsumoto@gmail.com
+/*
+NAME: Changhui Youn
+EMAIL: tonyyoun2@gmail.com
+ID: 304207830
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
-#include <time.h>
-#include <string.h>
-#include "SortedList.h"
-#include <pthread.h>
-#include <signal.h>
 #include <errno.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <signal.h>
+#include <pthread.h>
+#include <string.h>
+#include <time.h>
+#include "SortedList.h"
 
-int iterations = 1;
-int numThreads = 1;
-int numList = 1;
-int mutexFlag = 0;
-int spinLockFlag = 0;
-pthread_mutex_t* mutexes;
-SortedList_t* lists;
-SortedListElement_t* elements;
-int* spinLocks;
-int numElements = 0;
-char test[32] = "list-";
+
+#define THREAD 't'
+#define ITER 'i'
+#define YIELD 'y'
+#define SYNC 's'
+#define LIST 'l'
+
+#define SEC_TO_NSEC 1000000000L
+
+SortedList_t* listheads;
+SortedListElement_t* pool;
+
 int opt_yield = 0;
-char* yieldOpts = NULL;
-long long runTime = 0;
-int* nums;
+char opt_sync = 0;
+long threads = 1;
+long iterations = 1;
+long num_elements = 0;
+long num_list = 1;
 
-#define ONE_BILLION 1000000000L;
+pthread_mutex_t* mutexes;
+int* spin_lock;
+int* list_number;
 
-void print_csv_line(char* test, int threadNum, int iterations, int numList, int numOperation, long long runTime, long long avgTime, long long avgMutexTime){
-    fprintf(stdout, "%s,%d,%d,%d,%d,%lld,%lld,%lld\n", test, threadNum, iterations, numList, numOperation, runTime, avgTime, avgMutexTime);
+char test[16] = "list-";
+char* str_yield = NULL;
+
+// This function sets test string based on str_yield and opt_sync
+void set_test(){
+	if(str_yield == NULL){
+		str_yield = "none";
+	}
+	strcat(test, str_yield);
+	if(opt_sync == 'm'){
+		strcat(test, "-m");
+	}
+	else if(opt_sync == 's'){
+		strcat(test, "-s");
+	}
+	else {
+		strcat(test, "-none");
+	}
 }
 
-void getTestName(){
-    if(yieldOpts == NULL){
-        yieldOpts = "none";
-    }
-    strcat(test, yieldOpts);
-    if(mutexFlag){
-        strcat(test, "-m");
-    }
-    else if(spinLockFlag){
-        strcat(test, "-s");
-    }
-    else if(!mutexFlag && !spinLockFlag){
-        strcat(test, "-none");
-    }
+int hashkey(const char* key) {
+	// a simple hash of the key modulo the nuber of lists
+	return key[0] % num_list;
 }
 
-void print_errors(char* error){
-    if(strcmp(error, "clock_gettime") == 0){
-        fprintf(stderr, "Error initializing clock time\n");
-        exit(1);
-    }
-    if(strcmp(error, "thread_create") == 0){
-        fprintf(stderr, "Error creating threads.\n");
-        exit(2);
-    }
-    if(strcmp(error, "thread_join") == 0){
-        fprintf(stderr, "Error with pthread_join.\n");
-        exit(2);
-    }
-    if(strcmp(error, "mutex") == 0){
-        fprintf(stderr, "Error with pthread_join. \n");
-        exit(2);
-    }
-    if(strcmp(error, "segfault") == 0){
-        fprintf(stderr, "Segmentation fault caught! \n");
-        exit(2);
-    }
-    if(strcmp(error, "size") == 0){
-        fprintf(stderr, "Sorted List length is not zero. List Corrupted\n");
-        exit(2);
-    }
-    if(strcmp(error, "lookup") == 0){
-        fprintf(stderr, "Could not retrieve inserted element due to corrupted list.\n");
-        exit(2);
-    }
-    if(strcmp(error, "length") == 0){
-        fprintf(stderr, "Could not retrieve length because list is corrupted.\n");
-        exit(2);
-    }
-    if(strcmp(error, "delete") == 0){
-        fprintf(stderr, "Could not delete due to corrupted list. \n");
-        exit(2);
-    }
+void * thread_worker(void* arg) {
+	int i;
+	long wait_time = 0;
+	unsigned long num = *((unsigned long*) arg);
+	struct timespec begin, end;
+	for(i = num; i < num_elements; i += threads){
+		// SortedList_insert is critical section and it is
+		// wrapped with mutex lock or spin_lock based on opt_sync
+		int hash = hashkey(pool[i].key);
+		if(opt_sync == 'm') {
+			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			} 
+			pthread_mutex_lock(&mutexes[hash]);
+			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			}
+		} else if(opt_sync == 's') {
+			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			} 
+			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			}
+		} 
+		SortedList_insert(&listheads[hash], &pool[i]);
+		if(opt_sync == 'm') {
+			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+			pthread_mutex_unlock(&mutexes[hash]);
+		} else if(opt_sync == 's') {
+			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+			__sync_lock_release(&spin_lock[hash]);
+		} 
+	}
+
+	int length = 0;
+	// SortedList_length is critical section and it is
+	// wrapped with mutex lock or spin_lock based on opt_sync
+	for (i = 0; i < num_list; i++) {
+		if(opt_sync == 'm') {
+			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			} 
+			pthread_mutex_lock(&mutexes[i]);
+			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			}
+		} else if(opt_sync == 's') {
+			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			} 
+			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			}
+		} 
+		length = SortedList_length(&listheads[i]);
+		if (length < 0) {
+			fprintf(stderr, "Failed to read length\n");
+			exit(2);
+		}
+		if(opt_sync == 'm') {
+			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+			pthread_mutex_unlock(&mutexes[i]);
+		} else if(opt_sync == 's') {
+			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+			__sync_lock_release(&spin_lock[i]);
+		} 
+	}
+
+	SortedListElement_t *element;
+
+	for (i = num; i < num_elements; i += threads) {
+		// SortedList_lookup and SortedList_delete are critical section
+		// and they are wrapped with mutex lock or spin_lock based on opt_sync
+		int hash = hashkey(pool[i].key);
+		if(opt_sync == 'm') {
+			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			} 
+			pthread_mutex_lock(&mutexes[hash]);
+			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			}
+		} else if(opt_sync == 's') {
+			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			} 
+			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+				fprintf(stderr, "Gettime error\n");
+				exit(1);
+			}
+		} 
+		element = SortedList_lookup(&listheads[hash], pool[i].key);
+		if (element == NULL) {
+			fprintf(stderr, "Failure to look up element\n");
+			exit(2);
+		}
+
+		int n = SortedList_delete(element);
+		if (n != 0) {
+			fprintf(stderr, "Failure to delete element\n");
+			exit(2);
+		}
+		if(opt_sync == 'm') {
+			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+			pthread_mutex_unlock(&mutexes[hash]);
+		} else if(opt_sync == 's') {
+			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+			__sync_lock_release(&spin_lock[hash]);
+		} 
+	}
+	return (void *) wait_time;
 }
 
 void signal_handler(int sigNum){
-    if(sigNum == SIGSEGV){
-        print_errors("segfault");
-    }
-}//signal handler for SIGSEGV
-
-char* getRandomKey(){
-    char* random_key = (char*) malloc(sizeof(char)*2);
-    random_key[0] = (char) rand()%26 + 'a';
-    random_key[1] = '\0';
-    return random_key;
-}//https://stackoverflow.com/questions/19724346/generate-random-characters-in-c generating random characters in C
-
-int hashFunction(const char* keys){
-    return keys[0]%numList;
-}
-
-void setupLocks(){
-    if(mutexFlag){
-        mutexes = malloc(sizeof(pthread_mutex_t)*numList);
-    }
-    else if(spinLockFlag){
-        spinLocks = malloc(sizeof(int)*numList);
-    }
-    int i;
-    for(i = 0; i < numList; i++){
-        if(mutexFlag){
-            if(pthread_mutex_init(&mutexes[i], NULL) < 0){
-                print_errors("mutex");
-            }
-        }
-        else if(spinLockFlag){
-            spinLocks[i] = 0;
-        }
-        else {
-            break;
-        }
-    }
+	// handles segmentation fault
+	if(sigNum == SIGSEGV){
+		fprintf(stderr, "Segmentation fault caught!\n");
+		exit(2);
+	}
 }
 
 
-void initializeSubLists(){
-    lists = malloc(sizeof(SortedList_t)*numList);
-    int i;
-    for (i = 0; i < numList; i++){
-        lists[i].prev = &lists[i];
-        lists[i].next = &lists[i];
-        lists[i].key = NULL;
-    }
+char* rand_key(){
+	// generates randome string
+	// ref : https://stackoverflow.com/questions/15767691/whats-the-c-library-function-to-generate-random-string
+	char* random_key = (char*) malloc(sizeof(char)*10);
+	int i;
+	for (i=0; i<9; i++){
+		random_key[i] = '0' + rand()%72;
+	}
+	random_key[9] = '\0';
+	return random_key;
 }
 
-void initializeElements(int numElements){
-    int i;
-    for(i = 0; i < numElements; i++){
-        elements[i].key = getRandomKey();
-    }
-} //initializes elements with random key
 
-void splitElements(){
-    nums = malloc(sizeof(int)* numElements);
-    int i;
-    for(i = 0; i < numElements; i++){
-        nums[i] = hashFunction(elements[i].key);
-    }
-}//uae the hash function to choose which elements go in which list
-
-void initializeLists() {
-    initializeSubLists();
-    setupLocks();
-    initializeElements(numElements);
-    splitElements();
-}//method to initialize lists, keys, locks
-
-void* sorted_list_action(void* thread_id){
-    struct timespec start_time, end_time;
-    int i,j;
-    int num = *((int*)thread_id);
-    for(i = num; i < numElements; i += numThreads){
-        if(mutexFlag){
-            if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-                print_errors("clock_gettime");
-            }
-            pthread_mutex_lock(&mutexes[nums[i]]);
-            if(clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-                print_errors("clock_gettime");
-            }
-            runTime +=  (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-            runTime += end_time.tv_nsec;
-            runTime -= start_time.tv_nsec; //get lock run time
-            SortedList_insert(&lists[nums[i]], &elements[i]);
-            pthread_mutex_unlock(&mutexes[nums[i]]);
-        }
-        else if(spinLockFlag){
-            if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-                print_errors("clock_gettime");
-            }
-            while(__sync_lock_test_and_set(&spinLocks[nums[i]], 1));
-            if(clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-                print_errors("clock_gettime");
-            }
-            runTime += (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-            runTime += end_time.tv_nsec;
-            runTime -= start_time.tv_nsec; //get run time
-            SortedList_insert(&lists[nums[i]], &elements[i]);
-            __sync_lock_release(&spinLocks[nums[i]]);
-        }
-        else if(!spinLockFlag && !mutexFlag){
-            SortedList_insert(&lists[nums[i]], &elements[i]);
-        }
-    }
-    int length = 0;
-    if(mutexFlag){
-        for(j = 0; j < numList; j++){
-            if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-                print_errors("clock_gettime");
-            }
-            pthread_mutex_lock(&mutexes[j]);
-            if(clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-                print_errors("clock_gettime");
-            }
-            runTime +=  (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-            runTime += end_time.tv_nsec;
-            runTime -= start_time.tv_nsec; //get run time
-            int subLength = SortedList_length(&lists[j]);
-            if (subLength < 0){
-                print_errors("length");
-            }
-            length += subLength;
-            pthread_mutex_unlock(&mutexes[j]);
-        }
-    }
-    else if(spinLockFlag){
-        for(j = 0; j < numList; j++){
-            if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-                print_errors("clock_gettime");
-            }
-            while(__sync_lock_test_and_set(&spinLocks[j], 1));
-            if(clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-                print_errors("clock_gettime");
-            }
-            runTime +=  (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-            runTime += end_time.tv_nsec;
-            runTime -= start_time.tv_nsec; //get run time
-            int subLength = SortedList_length(&lists[j]);
-            if (subLength < 0){
-                print_errors("length");
-            }
-            length += subLength;
-            __sync_lock_release(&spinLocks[j]);
-        }
-    }
-    else if(!spinLockFlag && !mutexFlag){
-        for(j = 0; j < numList; j++){
-            int subLength = SortedList_length(&lists[j]);
-            if (subLength < 0){
-                print_errors("length");
-            }
-            length += subLength;
-        }
-    }
-    SortedListElement_t* insertedElement;
-    num = *((int*)thread_id);
-    for(i = num; i < numElements; i += numThreads){
-        if(mutexFlag){
-            if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-                print_errors("clock_gettime");
-            }
-            pthread_mutex_lock(&mutexes[nums[i]]);
-            if(clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-                print_errors("clock_gettime");
-            }
-            runTime +=  (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-            runTime += end_time.tv_nsec;
-            runTime -= start_time.tv_nsec; //get run time
-            insertedElement = SortedList_lookup(&lists[nums[i]], elements[i].key);
-            if(insertedElement == NULL){
-                print_errors("lookup");
-            }
-            int res = SortedList_delete(insertedElement);
-            if(res == 1){
-                print_errors("delete");
-            }
-            pthread_mutex_unlock(&mutexes[nums[i]]);
-        }
-        else if(spinLockFlag){
-            if(clock_gettime(CLOCK_MONOTONIC, &start_time) < 0){
-                print_errors("clock_gettime");
-            }
-            while(__sync_lock_test_and_set(&spinLocks[nums[i]], 1));
-            if(clock_gettime(CLOCK_MONOTONIC, &end_time) < 0){
-                print_errors("clock_gettime");
-            }
-            runTime +=  (end_time.tv_sec - start_time.tv_sec) * ONE_BILLION;
-            runTime += end_time.tv_nsec;
-            runTime -= start_time.tv_nsec; //get run time
-            insertedElement = SortedList_lookup(&lists[nums[i]], elements[i].key);
-            if(insertedElement == NULL){
-                print_errors("lookup");
-            }
-            int res = SortedList_delete(insertedElement);
-            if(res == 1){
-                print_errors("delete");
-            }
-            __sync_lock_release(&spinLocks[nums[i]]);
-        }
-        else if(!mutexFlag && !spinLockFlag){
-            insertedElement = SortedList_lookup(&lists[nums[i]], elements[i].key);
-            if(insertedElement == NULL){
-                print_errors("lookup");
-            }
-            int res = SortedList_delete(insertedElement);
-            if(res == 1){
-                print_errors("delete");
-            }
-        }
-    }
-    return NULL;
+// This function initialize pool with num_elements
+void init_elem(int num_elements) {
+	int i;
+	// seed rand()
+	srand(time(NULL));
+	for (i = 0; i < num_elements; i++) {
+		pool[i].key = rand_key();
+	}
 }
 
-int main(int argc, char** argv){
-    int opt = 0;
-    char input;
-    static struct option options [] = {
-        {"iterations", 1, 0, 'i'},
-        {"threads", 1, 0, 't'},
-        {"yield", 1, 0, 'y'},
-        {"sync", 1, 0, 's'},
-        {"lists", 1, 0, 'l'},
-        {0, 0, 0, 0}
-    };
-    while((opt=getopt_long(argc, argv, "i:t:ysl:", options, NULL)) != -1){
-        switch(opt){
-            case 'i':
-                iterations = (int)atoi(optarg);
-                break;
-            case 't':
-                numThreads = (int)atoi(optarg);
-                break;
-            case 'y':
-                yieldOpts = (char*) malloc(sizeof(char)*6);
-                yieldOpts = strdup(optarg);
-                size_t i;
-                for(i = 0; i < strlen(optarg); i++){
-                    switch(optarg[i]){
-                        case 'i':
-                            opt_yield |= INSERT_YIELD;
-                            break;
-                        case 'd':
-                            opt_yield |= DELETE_YIELD;
-                            break;
-                        case 'l':
-                            opt_yield |= LOOKUP_YIELD;
-                            break;
-                        default:
-                            fprintf(stderr, "Invalid argument for yield option. \n");
-                            exit(1);
-                        }
-                }
-                break;
-            case 's':
-                input = *optarg;
-                switch(input){
-                    case 'm':
-                        mutexFlag = 1;
-                        break;
-                    case 's':
-                        spinLockFlag = 1;
-                        break;
-                    default:
-                        fprintf(stderr, "Incorrect argument: correct usage is ./lab2_list --iterations iterations --threads numberOfThreads --yield optString [--sync option] \n");
-                        exit(1);
-                        break;
-                }
-                break;
-            case 'l':
-                numList = (int)atoi(optarg);
-                break;
-            default:
-                fprintf(stderr, "Incorrect argument: correct usage is ./lab2_list --iterations iterations --threads numberOfThreads --yield optString [--sync option] \n");
-                exit(1);
-                break;
-        }
-        
-    }//https://computing.llnl.gov/tutorials/pthreads/ for pthread help
-    signal(SIGSEGV, signal_handler);
-    numElements = numThreads*iterations;
-    elements = (SortedListElement_t*) malloc(sizeof(SortedListElement_t)*numElements);
-    srand((unsigned int) time(NULL)); //must use srand before rand
-    initializeLists();
-    
-    int i;
-    pthread_t threads[numThreads];
-    int thread_id[numThreads];
-    struct timespec start, end;
-    if (clock_gettime(CLOCK_MONOTONIC, &start) < 0){
-        print_errors("clock_gettime");
-    }
-    
-    for(i = 0; i < numThreads; i++){
-        thread_id[i] = i;
-        int rc = pthread_create(&threads[i], NULL, sorted_list_action, &thread_id[i]);
-        if(rc < 0){
-            print_errors("thread_create");
-        }
-    }
-    for(i = 0; i < numThreads; i++){
-        int rc = pthread_join(threads[i], NULL);
-        if(rc < 0){
-            print_errors("thread_join");
-        }
-    }
-    
-    if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
-        print_errors("clock_gettime");
-    }
-    
-    long long diff = (end.tv_sec - start.tv_sec) * ONE_BILLION;
-    diff += end.tv_nsec;
-    diff -= start.tv_nsec; //get run time
-    
-    for(i = 0; i < numList; i++){
-        if(SortedList_length(&lists[i]) != 0){
-            print_errors("size");
-        }
-    }
-
-    int numOpts = 3*iterations*numThreads; //get number of operations
-    int numLockOpts = (2*iterations + 1)*numThreads;
-    getTestName();
-    
-    print_csv_line(test, numThreads, iterations, numList, numOpts, diff, diff/numOpts, runTime/numLockOpts);
-    
-    for(i = 0; i < numElements; i++){
-        free((void*)elements[i].key);
-    }
-    free(elements);
-    free(lists);
-    if(mutexFlag){
-        free(mutexes);
-        for(i = 0; i < numList; i++){
-            pthread_mutex_destroy(&mutexes[i]);
-        }
-    }
-    if(spinLockFlag){
-        free(spinLocks);
-    }
-    free(nums);
-    exit(0);
+void print_csv(long threads, long iterations, long num_list, long num_operations, long run_time, long avg_per_op, long lock_time){
+	fprintf(stdout, "%s,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n", test, threads, iterations, num_list, num_operations, run_time, avg_per_op, lock_time);
 }
+
+int main(int argc, char *argv[]) {
+	int opt = 0;
+	threads = 1;
+	iterations = 1;
+	opt_yield = 0;
+	opt_sync = 0;
+	num_list = 1;
+
+	struct option options[] = {
+		{"threads", 1, NULL, THREAD},
+		{"iterations", 1, NULL, ITER},
+		{"yield", 1, NULL, YIELD},
+		{"sync", 1, NULL, SYNC},
+		{"lists", 1, NULL, LIST},
+		{0, 0, 0, 0}
+	};
+
+	ssize_t i;
+	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
+		switch (opt) {
+			case THREAD: 
+				// get threads #
+				threads = atoi(optarg);
+				break;
+			case ITER:
+				// get iteration #
+				iterations = atoi(optarg);
+				break;
+			case YIELD:
+				// get opt_yield and given string
+				for (i = 0; i < (ssize_t) strlen(optarg); i++) {
+					if (optarg[i] == 'i') {
+						opt_yield |= INSERT_YIELD;
+					} else if (optarg[i] == 'd') {
+						opt_yield |= DELETE_YIELD;
+					} else if (optarg[i] == 'l') {
+						opt_yield |= LOOKUP_YIELD;
+					} else {
+						fprintf(stderr, "Invalid argument : --yield only takes i, d, or l as an argument\n");
+						exit(1);
+					}
+				}
+				str_yield = (char*) malloc(sizeof(char)*5);
+				str_yield = optarg;
+				break;
+			case SYNC:
+				if(strlen(optarg) != 1) {
+					fprintf(stderr, "Invalid argument : --sync only takes m or s as an argument\n");
+					exit(1);
+				}
+				opt_sync = *optarg;
+				if(opt_sync != 'm' && opt_sync != 's'){
+					fprintf(stderr, "Invalid argument : --sync only takes m or s as an argument\n");
+					exit(1);
+				}
+				break;
+			case LIST:
+				num_list = atoi(optarg);
+				break;
+			default:
+				fprintf(stderr, "Invalid argument(s)\nYou may use --threads=#, --iterations=#, --yield=[idl], --sync=[m,s], --lists=#\n");
+				exit(1);
+				break;
+		}
+	}
+	signal(SIGSEGV, signal_handler);
+
+	num_elements = threads * iterations;
+
+	// listheads is currently empty and needs initialization
+	listheads = (SortedList_t*) malloc(sizeof(SortedList_t) * num_list);
+	for(i = 0; i < (ssize_t) num_list; i++){
+		listheads[i].prev = &listheads[i];
+		listheads[i].next = &listheads[i];
+		listheads[i].key = NULL;
+	}
+	// set up the locks
+	if(opt_sync == 'm') {
+		mutexes = malloc(sizeof(pthread_mutex_t) * num_list);
+		for (i = 0; i < num_list; i++) {
+			if (pthread_mutex_init(&mutexes[i], NULL) != 0) {
+				fprintf(stderr, "Fail to initialize mutex");
+				exit(1);
+			}
+		}
+	} else if (opt_sync == 's') {
+		spin_lock = malloc(sizeof(int) * num_list);
+		for (i = 0; i < num_list; i++) {
+			spin_lock[i] = 0;
+		}
+	}
+	pool = (SortedListElement_t*) malloc(sizeof(SortedListElement_t)*num_elements);
+	init_elem(num_elements);
+
+	struct timespec begin, end;
+	if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+		fprintf(stderr, "Gettime error\n");
+		exit(1);
+	} 
+
+	pthread_t *thread = malloc((sizeof(pthread_t) * threads));
+	int thread_id[threads];
+
+	for(i = 0; i < threads; i++) {
+		thread_id[i] = i;
+		if(pthread_create(&thread[i], NULL, thread_worker, &thread_id[i]) < 0){
+			fprintf(stderr, "Thread creation failed\n");
+			exit(1);
+		}
+	}
+	long total_wait_time = 0;
+	void** wait_time = (void *) malloc(sizeof(void**));
+	for(i = 0; i < threads; i++) {
+		if(pthread_join(thread[i], wait_time) < 0){
+			fprintf(stderr, "Thread join failed\n");
+			exit(1);
+		}
+		total_wait_time += (long) *wait_time;
+	}
+
+	// stop the timer
+	if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+		fprintf(stderr, "Gettime error\n");
+		exit(1);
+	}
+
+	if(SortedList_length(listheads) != 0){
+		fprintf(stderr, "Length of list is not 0\n");
+		exit(2);
+	}
+
+	long num_operations = threads * iterations * 3;
+	long run_time = SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+	long avg_per_op = run_time / num_operations;
+	long lock_time = total_wait_time / num_operations;
+
+	// print corresponding data
+	set_test();
+	print_csv(threads, iterations, num_list, num_operations, run_time, avg_per_op, lock_time);
+	if(opt_sync == 'm'){
+		for(i = 0; i < (ssize_t) num_list; i++)
+			pthread_mutex_destroy(&mutexes[i]);
+		free(mutexes);
+	} else if(opt_sync == 's')
+		free(spin_lock);
+
+	free(thread);
+	free(pool);
+	free(wait_time);
+	exit(0);
+
+
+}
+
 
 
 

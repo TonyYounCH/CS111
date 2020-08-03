@@ -62,9 +62,9 @@ set output 'lab2b_2.png'
 # note that unsuccessful runs should have produced no output
 plot \
 	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($8) \
-	title 'wait-for-lock time' with points lc rgb 'red', \
+	title 'wait-for-lock time' with linespoints lc rgb 'red', \
 	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):($7) \
-	title 'average time per operation' with points lc rgb 'green'
+	title 'average time per operation' with linespoints lc rgb 'green'
 	 
 set title "Successful Iterations vs. Threads for each Synchronization Method"
 set xlabel "Threads"
@@ -95,13 +95,13 @@ set output 'lab2b_4.png'
 # note that unsuccessful runs should have produced no output
 plot \
 	 "< grep 'list-none-m,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '1-list' with points lc rgb 'red', \
+	title '1-list' with linespoints lc rgb 'red', \
 	 "< grep 'list-none-m,[0-9]*,1000,4,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '4-lists' with points lc rgb 'green', \
+	title '4-lists' with linespoints lc rgb 'green', \
 	 "< grep 'list-none-m,[0-9]*,1000,8,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '8-lists' with points lc rgb 'blue', \
+	title '8-lists' with linespoints lc rgb 'blue', \
 	 "< grep 'list-none-m,[0-9]*,1000,16,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '16-lists' with points lc rgb 'violet'
+	title '16-lists' with linespoints lc rgb 'violet'
 
 
 set title "Throughput vs. Number of Threads for spin-lock-synchronized partitioned lists"
@@ -114,11 +114,11 @@ set output 'lab2b_5.png'
 # note that unsuccessful runs should have produced no output
 plot \
 	 "< grep 'list-none-s,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '1-list' with points lc rgb 'red', \
+	title '1-list' with linespoints lc rgb 'red', \
 	 "< grep 'list-none-s,[0-9]*,1000,4,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '4-lists' with points lc rgb 'green', \
+	title '4-lists' with linespoints lc rgb 'green', \
 	 "< grep 'list-none-s,[0-9]*,1000,8,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '8-lists' with points lc rgb 'blue', \
+	title '8-lists' with linespoints lc rgb 'blue', \
 	 "< grep 'list-none-s,[0-9]*,1000,16,' lab2b_list.csv" using ($2):(1000000000/($7)) \
-	title '16-lists' with points lc rgb 'violet'
+	title '16-lists' with linespoints lc rgb 'violet'
 	

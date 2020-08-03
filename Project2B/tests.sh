@@ -52,7 +52,7 @@ done
 # list-none-m
 for i in 1, 2, 4, 8, 12
 do
-	for j in 4, 8, 16
+	for j in 1, 4, 8, 16
 	do
 		./lab2_list --threads=$i --iterations=1000 --sync=m --lists=$j >> lab2b_list.csv
 	done
@@ -61,7 +61,7 @@ done
 # list-none-s
 for i in 1, 2, 4, 8, 12
 do
-	for j in 4, 8, 16
+	for j in 1, 4, 8, 16
 	do
 		./lab2_list --threads=$i --iterations=1000 --sync=s --lists=$j >> lab2b_list.csv
 	done

@@ -4,8 +4,8 @@
 # EMAIL: tonyyoun2@gmail.com
 # ID: 304207830
 
-rm -f lab2_list.csv
-touch lab2_list.csv
+rm -f lab2b_list.csv
+touch lab2b_list.csv
 
 # list-none-m for 1000
 for i in 1, 2, 4, 8, 12, 16, 24

@@ -11,7 +11,7 @@ tests: build
 
 profile:
 	rm -f ./raw.gperf profile.out
-	LD_PRELOAD=~/lib/libprofiler.so \
+	LD_PRELOAD=/usr/lib64/libprofiler.so \
 	CPUPROFILE=./raw.gperf ./lab2_list --threads=12 --iterations=1000 --sync=s 
 	pprof --text ./lab2_list ./raw.gperf > profile.out
 	pprof --list=thread_worker ./lab2_list ./raw.gperf >> profile.out

@@ -69,7 +69,7 @@ plot \
 set title "Successful Iterations vs. Threads for each Synchronization Method"
 set xlabel "Threads"
 set logscale x 2
-set xrange [0:]
+set xrange [0.75:]
 set ylabel "Successful Iterations"
 set logscale y 10
 set output 'lab2b_3.png'
@@ -88,7 +88,7 @@ plot \
 set title "Throughput vs. Number of Threads for mutex synchronized partitioned lists"
 set xlabel "Threads"
 set logscale x 2
-set xrange [0:]
+set xrange [0.75:]
 set ylabel "Throughput"
 set logscale y 10
 set output 'lab2b_4.png'
@@ -107,7 +107,7 @@ plot \
 set title "Throughput vs. Number of Threads for spin-lock-synchronized partitioned lists"
 set xlabel "Threads"
 set logscale x 2
-set xrange [0:]
+set xrange [0.75:]
 set ylabel "Throughput"
 set logscale y 10
 set output 'lab2b_4.png'

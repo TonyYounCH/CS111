@@ -21,7 +21,7 @@ graphs: tests
 	./lab2_list.gp
 
 dist: graphs profile
-	tar -czf lab2a-304207830.tar.gz lab2_list.c SortedList.h \
+	tar -czf lab2b-304207830.tar.gz lab2_list.c SortedList.h \
 	SortedList.c lab2b_list.csv profile.out lab2b_1.png \
 	lab2b_2.png lab2b_3.png lab2b_4.png lab2b_5.png \
 	lab2_list.gp Makefile README tests.sh

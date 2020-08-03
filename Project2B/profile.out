@@ -1,0 +1,301 @@
+Total: 466 samples
+     386  82.8%  82.8%      466 100.0% thread_worker
+      17   3.6%  86.5%       17   3.6% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:204
+      12   2.6%  89.1%       12   2.6% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:203
+      11   2.4%  91.4%       11   2.4% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       6   1.3%  92.7%       38   8.2% SortedList_lookup
+       6   1.3%  94.0%        6   1.3% _init
+       5   1.1%  95.1%        5   1.1% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:212
+       4   0.9%  95.9%        4   0.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       4   0.9%  96.8%        4   0.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       3   0.6%  97.4%        3   0.6% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:211
+       3   0.6%  98.1%        3   0.6% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       3   0.6%  98.7%       42   9.0% SortedList_insert
+       2   0.4%  99.1%        2   0.4% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:161
+       2   0.4%  99.6%        2   0.4% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:165
+       1   0.2%  99.8%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:205
+       1   0.2% 100.0%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1733
+       0   0.0% 100.0%      466 100.0% ?? /usr/src/debug////////glibc-2.17-c758a686/misc/../sysdeps/unix/sysv/linux/x86_64/clone.S:118
+       0   0.0% 100.0%      466 100.0% start_thread
+ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/Project2B/lab2_list.c
+   386    466 Total samples (flat / cumulative)
+     .      .   61: int hashkey(const char* key) {
+     .      .   62: 	// a simple hash of the key modulo the nuber of lists
+     .      .   63: 	return key[0] % num_list;
+     .      .   64: }
+     .      .   65: 
+---
+     .      .   66: void * thread_worker(void* arg) {
+     .      .   67: 	int i;
+     .      .   68: 	long wait_time = 0;
+     .      .   69: 	unsigned long num = *((unsigned long*) arg);
+     .      .   70: 	struct timespec begin, end;
+     .      .   71: 	for(i = num; i < num_elements; i += threads){
+     .      .   72: 		// SortedList_insert is critical section and it is
+     .      .   73: 		// wrapped with mutex lock or spin_lock based on opt_sync
+     .      .   74: 		int hash = hashkey(pool[i].key);
+     .      .   75: 		if(opt_sync == 'm') {
+     .      .   76: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .   77: 				fprintf(stderr, "Gettime error\n");
+     .      .   78: 				exit(1);
+     .      .   79: 			} 
+     .      .   80: 			pthread_mutex_lock(&mutexes[hash]);
+     .      .   81: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .   82: 				fprintf(stderr, "Gettime error\n");
+     .      .   83: 				exit(1);
+     .      .   84: 			}
+     .      .   85: 		} else if(opt_sync == 's') {
+     .      .   86: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .   87: 				fprintf(stderr, "Gettime error\n");
+     .      .   88: 				exit(1);
+     .      .   89: 			} 
+   277    277   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+     1      1   91: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .   92: 				fprintf(stderr, "Gettime error\n");
+     .      .   93: 				exit(1);
+     .      .   94: 			}
+     .      .   95: 		} 
+     .     42   96: 		SortedList_insert(&listheads[hash], &pool[i]);
+     .      .   97: 		if(opt_sync == 'm') {
+     .      .   98: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .   99: 			pthread_mutex_unlock(&mutexes[hash]);
+     .      .  100: 		} else if(opt_sync == 's') {
+     .      .  101: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  102: 			__sync_lock_release(&spin_lock[hash]);
+     .      .  103: 		} 
+     .      .  104: 	}
+     .      .  105: 
+     .      .  106: 	int length = 0;
+     .      .  107: 	// SortedList_length is critical section and it is
+     .      .  108: 	// wrapped with mutex lock or spin_lock based on opt_sync
+     .      .  109: 	for (i = 0; i < num_list; i++) {
+     .      .  110: 		if(opt_sync == 'm') {
+     .      .  111: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  112: 				fprintf(stderr, "Gettime error\n");
+     .      .  113: 				exit(1);
+     .      .  114: 			} 
+     .      .  115: 			pthread_mutex_lock(&mutexes[i]);
+     .      .  116: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  117: 				fprintf(stderr, "Gettime error\n");
+     .      .  118: 				exit(1);
+     .      .  119: 			}
+     .      .  120: 		} else if(opt_sync == 's') {
+     .      .  121: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  122: 				fprintf(stderr, "Gettime error\n");
+     .      .  123: 				exit(1);
+     .      .  124: 			} 
+     .      .  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+     .      .  126: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  127: 				fprintf(stderr, "Gettime error\n");
+     .      .  128: 				exit(1);
+     .      .  129: 			}
+     .      .  130: 		} 
+     .      .  131: 		length = SortedList_length(&listheads[i]);
+     .      .  132: 		if (length < 0) {
+     .      .  133: 			fprintf(stderr, "Failed to read length\n");
+     .      .  134: 			exit(2);
+     .      .  135: 		}
+     .      .  136: 		if(opt_sync == 'm') {
+     .      .  137: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  138: 			pthread_mutex_unlock(&mutexes[i]);
+     .      .  139: 		} else if(opt_sync == 's') {
+     .      .  140: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  141: 			__sync_lock_release(&spin_lock[i]);
+     .      .  142: 		} 
+     .      .  143: 	}
+     .      .  144: 
+     .      .  145: 	SortedListElement_t *element;
+     .      .  146: 
+     .      .  147: 	for (i = num; i < num_elements; i += threads) {
+     .      .  148: 		// SortedList_lookup and SortedList_delete are critical section
+     .      .  149: 		// and they are wrapped with mutex lock or spin_lock based on opt_sync
+     .      .  150: 		int hash = hashkey(pool[i].key);
+     .      .  151: 		if(opt_sync == 'm') {
+     .      .  152: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  153: 				fprintf(stderr, "Gettime error\n");
+     .      .  154: 				exit(1);
+     .      .  155: 			} 
+     .      .  156: 			pthread_mutex_lock(&mutexes[hash]);
+     .      .  157: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  158: 				fprintf(stderr, "Gettime error\n");
+     .      .  159: 				exit(1);
+     .      .  160: 			}
+     .      .  161: 		} else if(opt_sync == 's') {
+     .      .  162: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  163: 				fprintf(stderr, "Gettime error\n");
+     .      .  164: 				exit(1);
+     .      .  165: 			} 
+   108    108  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+     .      .  167: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  168: 				fprintf(stderr, "Gettime error\n");
+     .      .  169: 				exit(1);
+     .      .  170: 			}
+     .      .  171: 		} 
+     .     38  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
+     .      .  173: 		if (element == NULL) {
+     .      .  174: 			fprintf(stderr, "Failure to look up element\n");
+     .      .  175: 			exit(2);
+     .      .  176: 		}
+     .      .  177: 
+     .      .  178: 		int n = SortedList_delete(element);
+     .      .  179: 		if (n != 0) {
+     .      .  180: 			fprintf(stderr, "Failure to delete element\n");
+     .      .  181: 			exit(2);
+     .      .  182: 		}
+     .      .  183: 		if(opt_sync == 'm') {
+     .      .  184: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  185: 			pthread_mutex_unlock(&mutexes[hash]);
+     .      .  186: 		} else if(opt_sync == 's') {
+     .      .  187: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  188: 			__sync_lock_release(&spin_lock[hash]);
+     .      .  189: 		} 
+     .      .  190: 	}
+     .      .  191: 	return (void *) wait_time;
+     .      .  192: }
+---
+     .      .  193: 
+     .      .  194: void signal_handler(int sigNum){
+     .      .  195: 	// handles segmentation fault
+     .      .  196: 	if(sigNum == SIGSEGV){
+     .      .  197: 		fprintf(stderr, "Segmentation fault caught!\n");
+ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/Project2B/lab2_list.c
+   386    466 Total samples (flat / cumulative)
+     .      .   61: int hashkey(const char* key) {
+     .      .   62: 	// a simple hash of the key modulo the nuber of lists
+     .      .   63: 	return key[0] % num_list;
+     .      .   64: }
+     .      .   65: 
+---
+     .      .   66: void * thread_worker(void* arg) {
+     .      .   67: 	int i;
+     .      .   68: 	long wait_time = 0;
+     .      .   69: 	unsigned long num = *((unsigned long*) arg);
+     .      .   70: 	struct timespec begin, end;
+     .      .   71: 	for(i = num; i < num_elements; i += threads){
+     .      .   72: 		// SortedList_insert is critical section and it is
+     .      .   73: 		// wrapped with mutex lock or spin_lock based on opt_sync
+     .      .   74: 		int hash = hashkey(pool[i].key);
+     .      .   75: 		if(opt_sync == 'm') {
+     .      .   76: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .   77: 				fprintf(stderr, "Gettime error\n");
+     .      .   78: 				exit(1);
+     .      .   79: 			} 
+     .      .   80: 			pthread_mutex_lock(&mutexes[hash]);
+     .      .   81: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .   82: 				fprintf(stderr, "Gettime error\n");
+     .      .   83: 				exit(1);
+     .      .   84: 			}
+     .      .   85: 		} else if(opt_sync == 's') {
+     .      .   86: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .   87: 				fprintf(stderr, "Gettime error\n");
+     .      .   88: 				exit(1);
+     .      .   89: 			} 
+   277    277   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+     1      1   91: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .   92: 				fprintf(stderr, "Gettime error\n");
+     .      .   93: 				exit(1);
+     .      .   94: 			}
+     .      .   95: 		} 
+     .     42   96: 		SortedList_insert(&listheads[hash], &pool[i]);
+     .      .   97: 		if(opt_sync == 'm') {
+     .      .   98: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .   99: 			pthread_mutex_unlock(&mutexes[hash]);
+     .      .  100: 		} else if(opt_sync == 's') {
+     .      .  101: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  102: 			__sync_lock_release(&spin_lock[hash]);
+     .      .  103: 		} 
+     .      .  104: 	}
+     .      .  105: 
+     .      .  106: 	int length = 0;
+     .      .  107: 	// SortedList_length is critical section and it is
+     .      .  108: 	// wrapped with mutex lock or spin_lock based on opt_sync
+     .      .  109: 	for (i = 0; i < num_list; i++) {
+     .      .  110: 		if(opt_sync == 'm') {
+     .      .  111: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  112: 				fprintf(stderr, "Gettime error\n");
+     .      .  113: 				exit(1);
+     .      .  114: 			} 
+     .      .  115: 			pthread_mutex_lock(&mutexes[i]);
+     .      .  116: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  117: 				fprintf(stderr, "Gettime error\n");
+     .      .  118: 				exit(1);
+     .      .  119: 			}
+     .      .  120: 		} else if(opt_sync == 's') {
+     .      .  121: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  122: 				fprintf(stderr, "Gettime error\n");
+     .      .  123: 				exit(1);
+     .      .  124: 			} 
+     .      .  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+     .      .  126: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  127: 				fprintf(stderr, "Gettime error\n");
+     .      .  128: 				exit(1);
+     .      .  129: 			}
+     .      .  130: 		} 
+     .      .  131: 		length = SortedList_length(&listheads[i]);
+     .      .  132: 		if (length < 0) {
+     .      .  133: 			fprintf(stderr, "Failed to read length\n");
+     .      .  134: 			exit(2);
+     .      .  135: 		}
+     .      .  136: 		if(opt_sync == 'm') {
+     .      .  137: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  138: 			pthread_mutex_unlock(&mutexes[i]);
+     .      .  139: 		} else if(opt_sync == 's') {
+     .      .  140: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  141: 			__sync_lock_release(&spin_lock[i]);
+     .      .  142: 		} 
+     .      .  143: 	}
+     .      .  144: 
+     .      .  145: 	SortedListElement_t *element;
+     .      .  146: 
+     .      .  147: 	for (i = num; i < num_elements; i += threads) {
+     .      .  148: 		// SortedList_lookup and SortedList_delete are critical section
+     .      .  149: 		// and they are wrapped with mutex lock or spin_lock based on opt_sync
+     .      .  150: 		int hash = hashkey(pool[i].key);
+     .      .  151: 		if(opt_sync == 'm') {
+     .      .  152: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  153: 				fprintf(stderr, "Gettime error\n");
+     .      .  154: 				exit(1);
+     .      .  155: 			} 
+     .      .  156: 			pthread_mutex_lock(&mutexes[hash]);
+     .      .  157: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  158: 				fprintf(stderr, "Gettime error\n");
+     .      .  159: 				exit(1);
+     .      .  160: 			}
+     .      .  161: 		} else if(opt_sync == 's') {
+     .      .  162: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
+     .      .  163: 				fprintf(stderr, "Gettime error\n");
+     .      .  164: 				exit(1);
+     .      .  165: 			} 
+   108    108  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+     .      .  167: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
+     .      .  168: 				fprintf(stderr, "Gettime error\n");
+     .      .  169: 				exit(1);
+     .      .  170: 			}
+     .      .  171: 		} 
+     .     38  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
+     .      .  173: 		if (element == NULL) {
+     .      .  174: 			fprintf(stderr, "Failure to look up element\n");
+     .      .  175: 			exit(2);
+     .      .  176: 		}
+     .      .  177: 
+     .      .  178: 		int n = SortedList_delete(element);
+     .      .  179: 		if (n != 0) {
+     .      .  180: 			fprintf(stderr, "Failure to delete element\n");
+     .      .  181: 			exit(2);
+     .      .  182: 		}
+     .      .  183: 		if(opt_sync == 'm') {
+     .      .  184: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  185: 			pthread_mutex_unlock(&mutexes[hash]);
+     .      .  186: 		} else if(opt_sync == 's') {
+     .      .  187: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
+     .      .  188: 			__sync_lock_release(&spin_lock[hash]);
+     .      .  189: 		} 
+     .      .  190: 	}
+     .      .  191: 	return (void *) wait_time;
+     .      .  192: }
+---
+     .      .  193: 
+     .      .  194: void signal_handler(int sigNum){
+     .      .  195: 	// handles segmentation fault
+     .      .  196: 	if(sigNum == SIGSEGV){
+     .      .  197: 		fprintf(stderr, "Segmentation fault caught!\n");

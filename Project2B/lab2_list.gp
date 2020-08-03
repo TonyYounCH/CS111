@@ -110,7 +110,7 @@ set logscale x 2
 set xrange [0.75:]
 set ylabel "Throughput"
 set logscale y 10
-set output 'lab2b_4.png'
+set output 'lab2b_5.png'
 # note that unsuccessful runs should have produced no output
 plot \
 	 "< grep 'list-none-s,[0-9]*,1000,1,' lab2b_list.csv" using ($2):(1000000000/($7)) \

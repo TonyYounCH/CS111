@@ -18,6 +18,7 @@ profile:
 	rm -f ./raw.gperf
 
 graphs: tests
+	chmod +x lab2_list.gp
 	./lab2_list.gp
 
 dist: graphs profile

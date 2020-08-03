@@ -28,4 +28,4 @@ dist: graphs profile
 	lab2_list.gp Makefile README tests.sh
 
 clean:
-	rm -f *.o lab2_list *.txt *.tar.gz
+	rm -f *.o lab2_list *.txt *.tar.gz *.csv

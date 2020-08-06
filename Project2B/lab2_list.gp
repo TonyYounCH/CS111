@@ -76,7 +76,7 @@ set output 'lab2b_3.png'
 # note that unsuccessful runs should have produced no output
 plot \
 	"< grep 'list-id-none,[0-9]*,[0-9]*,4,' lab2b_list.csv" using ($2):($3) \
-	title 'no synchronization' with points lc rgb 'red', \
+	title 'no protection' with points lc rgb 'red', \
 	"< grep 'list-id-m,[0-9]*,[0-9]*,4,' lab2b_list.csv" using ($2):($3) \
 	title 'mutex protected' with points lc rgb 'green', \
 	"< grep 'list-id-s,[0-9]*,[0-9]*,4,' lab2b_list.csv" using ($2):($3) \

@@ -36,7 +36,6 @@ long num_list = 1;
 
 pthread_mutex_t* mutexes;
 int* spin_lock;
-int* list_number;
 
 char test[16] = "list-";
 char* str_yield = NULL;
@@ -69,9 +68,10 @@ void * thread_worker(void* arg) {
 	unsigned long num = *((unsigned long*) arg);
 	struct timespec begin, end;
 	for(i = num; i < num_elements; i += threads){
+		// create hash key that corresponds to element key
+		int hash = hashkey(pool[i].key);
 		// SortedList_insert is critical section and it is
 		// wrapped with mutex lock or spin_lock based on opt_sync
-		int hash = hashkey(pool[i].key);
 		if(opt_sync == 'm') {
 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
 				fprintf(stderr, "Gettime error\n");
@@ -344,6 +344,7 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "Thread join failed\n");
 			exit(1);
 		}
+		// adds all wait time that thread_worker function returns
 		total_wait_time += (long) *wait_time;
 	}
 

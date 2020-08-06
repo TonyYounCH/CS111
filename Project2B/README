@@ -25,6 +25,12 @@ test, threads, iterations, list, num_operations, run_time, avg_per_op
 
 
 ##################
+#  SortedList.h  #
+##################
+
+a header file containing interfaces for linked list operations.
+
+##################
 #  SortedList.c  #
 ##################
 
@@ -35,6 +41,13 @@ in SortedList_insert if opt_yield & INSERT_YIELD
 in SortedList_delete if opt_yield & DELETE_YIELD
 in SortedList_lookup if opt_yield & LOOKUP_YIELD
 in SortedList_length if opt_yield & LOOKUP_YIELD
+
+
+##################
+#  lab2_list.gp  #
+##################
+
+Graph generating script using gnuplot
 
 #################
 #     Graph     #
@@ -54,14 +67,20 @@ in SortedList_length if opt_yield & LOOKUP_YIELD
 #      CSV      #
 #################
 
-lab2_list.csv : containing all of results for all of the lab2_list tests.
+lab2b_list.csv : containing all of results for all of the lab2_list tests.
 
+
+##################
+#   profile.out  #
+##################
+
+Execution profiling report showing where time was spent in the un-partitioned spin-lock implementation.
 
 ##################
 #    Makefile    #
 ##################
 
-build	: create lab2_list executable
+default	: the lab2_list executable (compiling with the -Wall and -Wextra options)
 tests 	: run all specified test cases to generate CSV results
 profile : run tests with profiling tools to generate an execution profiling report 
 graphs 	: use gnuplot to generate the required graphs

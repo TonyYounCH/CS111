@@ -2,10 +2,10 @@
 # EMAIL: tonyyoun2@gmail.com
 # ID: 304207830
 
-build:
+default:
 	gcc -g -Wall -Wextra -lpthread lab2_list.c SortedList.c -o lab2_list
 
-tests: build
+tests: default
 	chmod +x tests.sh
 	./tests.sh
 

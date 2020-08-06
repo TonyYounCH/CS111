@@ -1,39 +1,39 @@
-Total: 648 samples
-     560  86.4%  86.4%      648 100.0% thread_worker
-      15   2.3%  88.7%       15   2.3% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:204
-      14   2.2%  90.9%       14   2.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-      12   1.9%  92.7%       12   1.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:203
-      11   1.7%  94.4%       51   7.9% SortedList_insert
-       7   1.1%  95.5%        7   1.1% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:211
-       6   0.9%  96.5%       36   5.6% SortedList_lookup
-       5   0.8%  97.2%        5   0.8% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-       5   0.8%  98.0%        5   0.8% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-       3   0.5%  98.5%        3   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:165
-       3   0.5%  98.9%        3   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:212
-       3   0.5%  99.4%        3   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
-       1   0.2%  99.5%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:161
-       1   0.2%  99.7%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:205
-       1   0.2%  99.8%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:206
-       1   0.2% 100.0%        1   0.2% SortedList_length
-       0   0.0% 100.0%      648 100.0% ?? /usr/src/debug////////glibc-2.17-c758a686/misc/../sysdeps/unix/sysv/linux/x86_64/clone.S:118
-       0   0.0% 100.0%      648 100.0% start_thread
+Total: 429 samples
+     350  81.6%  81.6%      429 100.0% thread_worker
+      19   4.4%  86.0%       19   4.4% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+      11   2.6%  88.6%       11   2.6% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:204
+       9   2.1%  90.7%        9   2.1% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:203
+       6   1.4%  92.1%        6   1.4% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       6   1.4%  93.5%       42   9.8% SortedList_insert
+       6   1.4%  94.9%       37   8.6% SortedList_lookup
+       4   0.9%  95.8%        4   0.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:211
+       4   0.9%  96.7%        4   0.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       4   0.9%  97.7%        4   0.9% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1734
+       3   0.7%  98.4%        3   0.7% _init
+       2   0.5%  98.8%        2   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:165
+       2   0.5%  99.3%        2   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:205
+       2   0.5%  99.8%        2   0.5% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:212
+       1   0.2% 100.0%        1   0.2% ?? /usr/src/debug////////glibc-2.17-c758a686/string/../sysdeps/x86_64/multiarch/strcmp-sse42.S:1733
+       0   0.0% 100.0%      429 100.0% ?? /usr/src/debug////////glibc-2.17-c758a686/misc/../sysdeps/unix/sysv/linux/x86_64/clone.S:118
+       0   0.0% 100.0%      429 100.0% start_thread
 ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/Project2B/lab2_list.c
-   560    648 Total samples (flat / cumulative)
-     .      .   61: int hashkey(const char* key) {
-     .      .   62: 	// a simple hash of the key modulo the nuber of lists
-     .      .   63: 	return key[0] % num_list;
-     .      .   64: }
-     .      .   65: 
+   350    429 Total samples (flat / cumulative)
+     .      .   60: int hashkey(const char* key) {
+     .      .   61: 	// a simple hash of the key modulo the nuber of lists
+     .      .   62: 	return key[0] % num_list;
+     .      .   63: }
+     .      .   64: 
 ---
-     .      .   66: void * thread_worker(void* arg) {
-     .      .   67: 	int i;
-     .      .   68: 	long wait_time = 0;
-     .      .   69: 	unsigned long num = *((unsigned long*) arg);
-     .      .   70: 	struct timespec begin, end;
-     .      .   71: 	for(i = num; i < num_elements; i += threads){
-     .      .   72: 		// SortedList_insert is critical section and it is
-     .      .   73: 		// wrapped with mutex lock or spin_lock based on opt_sync
-     .      .   74: 		int hash = hashkey(pool[i].key);
+     .      .   65: void * thread_worker(void* arg) {
+     .      .   66: 	int i;
+     .      .   67: 	long wait_time = 0;
+     .      .   68: 	unsigned long num = *((unsigned long*) arg);
+     .      .   69: 	struct timespec begin, end;
+     .      .   70: 	for(i = num; i < num_elements; i += threads){
+     .      .   71: 		// create hash key that corresponds to element key
+     .      .   72: 		int hash = hashkey(pool[i].key);
+     .      .   73: 		// SortedList_insert is critical section and it is
+     .      .   74: 		// wrapped with mutex lock or spin_lock based on opt_sync
      .      .   75: 		if(opt_sync == 'm') {
      .      .   76: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
      .      .   77: 				fprintf(stderr, "Gettime error\n");
@@ -49,13 +49,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .   87: 				fprintf(stderr, "Gettime error\n");
      .      .   88: 				exit(1);
      .      .   89: 			} 
-   305    305   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   239    239   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .   91: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .   92: 				fprintf(stderr, "Gettime error\n");
      .      .   93: 				exit(1);
      .      .   94: 			}
      .      .   95: 		} 
-     .     51   96: 		SortedList_insert(&listheads[hash], &pool[i]);
+     .     42   96: 		SortedList_insert(&listheads[hash], &pool[i]);
      .      .   97: 		if(opt_sync == 'm') {
      .      .   98: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
      .      .   99: 			pthread_mutex_unlock(&mutexes[hash]);
@@ -84,13 +84,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  122: 				fprintf(stderr, "Gettime error\n");
      .      .  123: 				exit(1);
      .      .  124: 			} 
-     2      2  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+     .      .  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
      .      .  126: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  127: 				fprintf(stderr, "Gettime error\n");
      .      .  128: 				exit(1);
      .      .  129: 			}
      .      .  130: 		} 
-     .      1  131: 		length = SortedList_length(&listheads[i]);
+     .      .  131: 		length = SortedList_length(&listheads[i]);
      .      .  132: 		if (length < 0) {
      .      .  133: 			fprintf(stderr, "Failed to read length\n");
      .      .  134: 			exit(2);
@@ -125,13 +125,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  163: 				fprintf(stderr, "Gettime error\n");
      .      .  164: 				exit(1);
      .      .  165: 			} 
-   253    253  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   111    111  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .  167: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  168: 				fprintf(stderr, "Gettime error\n");
      .      .  169: 				exit(1);
      .      .  170: 			}
      .      .  171: 		} 
-     .     36  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
+     .     37  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
      .      .  173: 		if (element == NULL) {
      .      .  174: 			fprintf(stderr, "Failure to look up element\n");
      .      .  175: 			exit(2);
@@ -159,22 +159,23 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  196: 	if(sigNum == SIGSEGV){
      .      .  197: 		fprintf(stderr, "Segmentation fault caught!\n");
 ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/Project2B/lab2_list.c
-   560    648 Total samples (flat / cumulative)
-     .      .   61: int hashkey(const char* key) {
-     .      .   62: 	// a simple hash of the key modulo the nuber of lists
-     .      .   63: 	return key[0] % num_list;
-     .      .   64: }
-     .      .   65: 
+   350    429 Total samples (flat / cumulative)
+     .      .   60: int hashkey(const char* key) {
+     .      .   61: 	// a simple hash of the key modulo the nuber of lists
+     .      .   62: 	return key[0] % num_list;
+     .      .   63: }
+     .      .   64: 
 ---
-     .      .   66: void * thread_worker(void* arg) {
-     .      .   67: 	int i;
-     .      .   68: 	long wait_time = 0;
-     .      .   69: 	unsigned long num = *((unsigned long*) arg);
-     .      .   70: 	struct timespec begin, end;
-     .      .   71: 	for(i = num; i < num_elements; i += threads){
-     .      .   72: 		// SortedList_insert is critical section and it is
-     .      .   73: 		// wrapped with mutex lock or spin_lock based on opt_sync
-     .      .   74: 		int hash = hashkey(pool[i].key);
+     .      .   65: void * thread_worker(void* arg) {
+     .      .   66: 	int i;
+     .      .   67: 	long wait_time = 0;
+     .      .   68: 	unsigned long num = *((unsigned long*) arg);
+     .      .   69: 	struct timespec begin, end;
+     .      .   70: 	for(i = num; i < num_elements; i += threads){
+     .      .   71: 		// create hash key that corresponds to element key
+     .      .   72: 		int hash = hashkey(pool[i].key);
+     .      .   73: 		// SortedList_insert is critical section and it is
+     .      .   74: 		// wrapped with mutex lock or spin_lock based on opt_sync
      .      .   75: 		if(opt_sync == 'm') {
      .      .   76: 			if(clock_gettime(CLOCK_MONOTONIC, &begin) < 0){
      .      .   77: 				fprintf(stderr, "Gettime error\n");
@@ -190,13 +191,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .   87: 				fprintf(stderr, "Gettime error\n");
      .      .   88: 				exit(1);
      .      .   89: 			} 
-   305    305   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   239    239   90: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .   91: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .   92: 				fprintf(stderr, "Gettime error\n");
      .      .   93: 				exit(1);
      .      .   94: 			}
      .      .   95: 		} 
-     .     51   96: 		SortedList_insert(&listheads[hash], &pool[i]);
+     .     42   96: 		SortedList_insert(&listheads[hash], &pool[i]);
      .      .   97: 		if(opt_sync == 'm') {
      .      .   98: 			wait_time += SEC_TO_NSEC * (end.tv_sec - begin.tv_sec) + end.tv_nsec - begin.tv_nsec;
      .      .   99: 			pthread_mutex_unlock(&mutexes[hash]);
@@ -225,13 +226,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  122: 				fprintf(stderr, "Gettime error\n");
      .      .  123: 				exit(1);
      .      .  124: 			} 
-     2      2  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
+     .      .  125: 			while(__sync_lock_test_and_set(&spin_lock[i], 1));
      .      .  126: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  127: 				fprintf(stderr, "Gettime error\n");
      .      .  128: 				exit(1);
      .      .  129: 			}
      .      .  130: 		} 
-     .      1  131: 		length = SortedList_length(&listheads[i]);
+     .      .  131: 		length = SortedList_length(&listheads[i]);
      .      .  132: 		if (length < 0) {
      .      .  133: 			fprintf(stderr, "Failed to read length\n");
      .      .  134: 			exit(2);
@@ -266,13 +267,13 @@ ROUTINE ====================== thread_worker in /u/cs/ugrad/hui/Documents/CS111/
      .      .  163: 				fprintf(stderr, "Gettime error\n");
      .      .  164: 				exit(1);
      .      .  165: 			} 
-   253    253  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
+   111    111  166: 			while(__sync_lock_test_and_set(&spin_lock[hash], 1));
      .      .  167: 			if(clock_gettime(CLOCK_MONOTONIC, &end) < 0){
      .      .  168: 				fprintf(stderr, "Gettime error\n");
      .      .  169: 				exit(1);
      .      .  170: 			}
      .      .  171: 		} 
-     .     36  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
+     .     37  172: 		element = SortedList_lookup(&listheads[hash], pool[i].key);
      .      .  173: 		if (element == NULL) {
      .      .  174: 			fprintf(stderr, "Failure to look up element\n");
      .      .  175: 			exit(2);

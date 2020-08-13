@@ -8,7 +8,7 @@ ifeq ($(findstring beaglebone,$(UNAME)),beaglebone)
 	COMP := gcc -g -lm -lmraa -Wall -Wextra lab4b.c -o lab4b
 else
 	# Not found
-	COMP := gcc -g -lm -lmraa -Wall -Wextra -DDUMMY lab4b.c -o lab4b
+	COMP := gcc -g -lm -Wall -Wextra -DDUMMY lab4b.c -o lab4b
 endif
 
 default:

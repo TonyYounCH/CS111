@@ -41,8 +41,9 @@ char* get_time(time_t time) {
 }
 
 
-void printDirectoryEntries(uint32_t starting, uint32_t parentNum)
+void directory_entries(uint32_t parent_inode, uint32_t block_num)
 {
+	uint32_t starting = block_num * block_size;
 	struct ext2_dir_entry dir;
     uint32_t current = starting;
     while(current < starting + block_size)
@@ -61,29 +62,29 @@ void printDirectoryEntries(uint32_t starting, uint32_t parentNum)
 
 }
 
-/* given location of directory entry block, produce directory entry summary */
-void directory_entries(unsigned int parent_inode, unsigned int block_num) {
-	struct ext2_dir_entry dir_entry;
-	uint32_t offset = SUPER_OFFSET + (block_num - 1) * block_size;
-	uint32_t num_bytes = 0;
+// /* given location of directory entry block, produce directory entry summary */
+// void directory_entries(unsigned int parent_inode, unsigned int block_num) {
+// 	struct ext2_dir_entry dir_entry;
+// 	uint32_t offset = SUPER_OFFSET + (block_num - 1) * block_size;
+// 	uint32_t num_bytes = 0;
 
-	while(num_bytes < block_size) {
-		memset(dir_entry.name, 0, 256);
-		pread(disk_fd, &dir_entry, sizeof(struct ext2_dir_entry), offset + num_bytes);
-		if (dir_entry.inode != 0) { //entry is not empty
-			memset(&dir_entry.name[dir_entry.name_len], 0, 256 - dir_entry.name_len);
-			fprintf(stdout, "DIRENT,%d,%d,%d,%d,%d,'%s'\n",
-				parent_inode, //parent inode number
-				num_bytes, //logical byte offset
-				dir_entry.inode, //inode number of the referenced file
-				dir_entry.rec_len, //entry length
-				dir_entry.name_len, //name length
-				dir_entry.name //name, string, surrounded by single-quotes
-			);
-		}
-		num_bytes += dir_entry.rec_len;
-	}
-}
+// 	while(num_bytes < block_size) {
+// 		memset(dir_entry.name, 0, 256);
+// 		pread(disk_fd, &dir_entry, sizeof(struct ext2_dir_entry), offset + num_bytes);
+// 		if (dir_entry.inode != 0) { //entry is not empty
+// 			memset(&dir_entry.name[dir_entry.name_len], 0, 256 - dir_entry.name_len);
+// 			fprintf(stdout, "DIRENT,%d,%d,%d,%d,%d,'%s'\n",
+// 				parent_inode, //parent inode number
+// 				num_bytes, //logical byte offset
+// 				dir_entry.inode, //inode number of the referenced file
+// 				dir_entry.rec_len, //entry length
+// 				dir_entry.name_len, //name length
+// 				dir_entry.name //name, string, surrounded by single-quotes
+// 			);
+// 		}
+// 		num_bytes += dir_entry.rec_len;
+// 	}
+// }
 
 
 void superblock_summary() {
@@ -294,19 +295,13 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 	}
 	fprintf(stdout, "\n");
 
-	// //if the file_type is a directory, need to create a directory entry
-	// for (i = 0; i < 12; i++) {
-	// 	if (inode.i_block[i] != 0 && file_type == 'd') {
-	// 		directory_entries(num_free_inode, inode.i_block[i]);
-	// 	}
-	// }
-
 	//if the file_type is a directory, need to create a directory entry
 	for (i = 0; i < 12; i++) {
 		if (inode.i_block[i] != 0 && file_type == 'd') {
-			printDirectoryEntries(block_size * inode.i_block[i], num_free_inode);
+			directory_entries(num_free_inode, inode.i_block[i]);
 		}
 	}
+
 
 
 	single_indirect_block(inode, num_free_inode, file_type);

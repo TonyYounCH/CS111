@@ -85,14 +85,13 @@ void free_block_enties(uint32_t block_bitmap, int group_num){
 }
 
 void single_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
-
 	if (inode.i_block[12] != 0) {
 		uint32_t offset = inode.i_block[12] * block_size;
 		uint32_t block;		
 
 		uint32_t i;
 		for (i = 0; i < block_size / sizeof(uint32_t); i++) {
-			pread(disk_fd, &block, sizeof(uint32_t), offset + i * 4);
+			pread(disk_fd, &block, sizeof(uint32_t), offset + i * sizeof(uint32_t));
 			if (block != 0) {
 				if (file_type == 'd') {
 					directory_entries(num_free_inode, block);
@@ -105,28 +104,24 @@ void single_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, cha
 }
 
 void double_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
-
 	if (inode.i_block[13] != 0) {
-		uint32_t offset = inode.i_block[13] * block_size;
-		uint32_t block;		
+		uint32_t indr_offset = inode.i_block[13] * block_size;
+		uint32_t indr_block;		
 
-		uint32_t blockOffset;
-		uint32_t blockValue;
-
-		uint32_t i;
-		uint32_t j;
+		uint32_t i, j;
 		for (i = 0; i < block_size / sizeof(uint32_t); i++) {
-			pread(disk_fd, &block, sizeof(uint32_t), offset + i * 4);
-			if (block != 0) {
-				blockOffset = block * block_size;
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 2, (int) (block_size / sizeof(uint32_t)) + 12 + i, inode.i_block[13], block);
+			uint32_t offset, block;
+			pread(disk_fd, &indr_block, sizeof(uint32_t), indr_offset + i * sizeof(uint32_t));
+			if (indr_block != 0) {
+				offset = indr_block * block_size;
+				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 2, (int) (block_size / sizeof(uint32_t)) + 12 + i, inode.i_block[13], indr_block);
 				for (j = 0; j < block_size / sizeof(uint32_t); j++){
-					pread(disk_fd, &blockValue, sizeof(uint32_t), blockOffset + j * 4);
-					if(blockValue != 0) {
+					pread(disk_fd, &block, sizeof(uint32_t), offset + j * sizeof(uint32_t));
+					if(block != 0) {
 						if (file_type == 'd') {
-							directory_entries(num_free_inode, blockValue);
+							directory_entries(num_free_inode, block);
 						}
-						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, (int) (block_size / sizeof(uint32_t)) + 12 + j, block, blockValue);
+						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, (int) (block_size / sizeof(uint32_t)) + 12 + j, indr_block, block);
 
 					}
 				}
@@ -138,67 +133,39 @@ void double_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, cha
 
 void tripple_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
 
-	//triply indirect entry
 	if (inode.i_block[14] != 0) {
-		uint32_t *indir2_block_ptrs = malloc(block_size);
-		uint32_t num_ptrs = block_size / sizeof(uint32_t);
+		uint32_t indr1_offset = inode.i_block[14] * block_size;
+		uint32_t indr1_block;		
 
-		uint32_t indir3_offset = block_offset(inode.i_block[14]);
-		pread(disk_fd, indir2_block_ptrs, block_size, indir3_offset);
+		uint32_t i, j, k;
+		for (i = 0; i < block_size / sizeof(uint32_t); i++) {
+			uint32_t indr_offset, indr_block;
+			pread(disk_fd, &indr1_block, sizeof(uint32_t), indr1_offset + i * sizeof(uint32_t));
+			if (indr1_block != 0) {
+				indr_offset = indr1_block * block_size;
+				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 3, 65536 + (int) (block_size / sizeof(uint32_t)) + 12 + i, inode.i_block[14], indr1_block);
 
-		uint32_t j;
-		for (j = 0; j < num_ptrs; j++) {
-			if (indir2_block_ptrs[j] != 0) {
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-					num_free_inode, //inode number
-					3, //level of indirection
-					65536 + 256 + 12 + j, //logical block offset
-					inode.i_block[14], //block number of indirect block being scanned
-					indir2_block_ptrs[j] //block number of reference block
-				);
+				uint32_t offset, block;
+				for (j = 0; j < block_size / sizeof(uint32_t); j++){
+					pread(disk_fd, &indr_block, sizeof(uint32_t), indr_offset + j * sizeof(uint32_t));
+					if(indr_block != 0) {
+						offset = indr_block * block_size;
+						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 2, 65536 + (int) (block_size / sizeof(uint32_t)) + 12 + j, indr1_block, indr_block);
 
-				uint32_t *indir_block_ptrs = malloc(block_size);
-				uint32_t indir2_offset = block_offset(indir2_block_ptrs[j]);
-				pread(disk_fd, indir_block_ptrs, block_size, indir2_offset);
-
-				uint32_t k;
-				for (k = 0; k < num_ptrs; k++) {
-					if (indir_block_ptrs[k] != 0) {
-						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-							num_free_inode, //inode number
-							2, //level of indirection
-							65536 + 256 + 12 + k, //logical block offset
-							indir2_block_ptrs[j], //block number of indirect block being scanned
-							indir_block_ptrs[k] //block number of reference block	
-						);	
-						uint32_t *block_ptrs = malloc(block_size);
-						uint32_t indir_offset = block_offset(indir_block_ptrs[k]);
-						pread(disk_fd, block_ptrs, block_size, indir_offset);
-
-						uint32_t l;
-						for (l = 0; l < num_ptrs; l++) {
-							if (block_ptrs[l] != 0) {
+						for (k = 0; k < block_size / sizeof(uint32_t); k++){
+							pread(disk_fd, &block, sizeof(uint32_t), offset + k * sizeof(uint32_t));
+							if(block != 0) {
 								if (file_type == 'd') {
-									directory_entries(num_free_inode, block_ptrs[l]);
+									directory_entries(num_free_inode, block);
 								}
-								fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-									num_free_inode, //inode number
-									1, //level of indirection
-									65536 + 256 + 12 + l, //logical block offset
-									indir_block_ptrs[k], //block number of indirect block being scanned
-									block_ptrs[l] //block number of reference block	
-								);
+								fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, 65536 + (int) (block_size / sizeof(uint32_t)) + 12 + k, indr_block, block);
 							}
 						}
-						free(block_ptrs);
 					}
 				}
-				free(indir_block_ptrs);
 			}
 		}
-		free(indir2_block_ptrs);
 	}
-
 }
 void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 	struct ext2_inode inode;

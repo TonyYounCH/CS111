@@ -44,20 +44,15 @@ char* get_time(time_t time) {
 void directory_entries(uint32_t parent_inode, uint32_t block_num)
 {
 	uint32_t starting = block_num * block_size;
-	struct ext2_dir_entry dir;
+	struct ext2_dir_entry dir_entry;
     uint32_t current = starting;
     while(current < starting + block_size)
     {
-        pread(disk_fd, &dir, sizeof(struct ext2_dir_entry), current);
-        uint32_t parent = parent_inode, logical = current - starting, inodeNumber = dir.inode, entryLength = dir.rec_len, nameLength = dir.name_len;
-        current += entryLength;
-        if(inodeNumber == 0)
-            continue;
-        fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'", parent, logical, inodeNumber, entryLength, nameLength);
-        uint32_t i;
-        for(i = 0; i < nameLength; i++)
-            fprintf(stdout, "%c", dir.name[i]);
-        fprintf(stdout, "'\n");
+        pread(disk_fd, &dir_entry, sizeof(struct ext2_dir_entry), current);
+        uint32_t logical_byte = current - starting;
+        current += dir_entry.rec_len;
+        if(dir_entry.inode != 0)
+        	fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'%s'\n", parent_inode, logical_byte, dir_entry.inode, dir_entry.rec_len, dir_entry.name_len, dir_entry.name);
     }
 
 }

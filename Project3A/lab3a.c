@@ -53,7 +53,8 @@ void printDirectoryEntries(uint32_t starting, uint32_t parentNum)
         if(inodeNumber == 0)
             continue;
         fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'", parent, logical, inodeNumber, entryLength, nameLength);
-        for(uint32_t i = 0; i < nameLength; i++)
+        uint32_t i;
+        for(i = 0; i < nameLength; i++)
             fprintf(stdout, "%c", dir.name[i]);
         fprintf(stdout, "'\n");
     }

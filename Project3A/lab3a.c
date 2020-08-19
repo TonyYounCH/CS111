@@ -1,343 +1,368 @@
-/*
-NAME: Changhui Youn
-EMAIL: tonyyoun2@gmail.com
-ID: 304207830
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <string.h>
-#include <limits.h>
-#include <stdint.h>
-#include <time.h>
-#include <getopt.h>
+#include <unistd.h>
 #include "ext2_fs.h"
+#include <sys/types.h>
+#include <fcntl.h>
+#include <time.h>
+#include <stdint.h>
+int mountFd = -1;
 
-#define SUPER_OFFSET 1024
+#define SB_OFFSET 1024
+struct ext2_super_block sb;
+struct ext2_inode inode;
+struct ext2_group_desc group;
+struct ext2_dir_entry dir;
+uint32_t blockSize;
+uint32_t inodeSize;
 
 
-int disk_fd;
+void print_errors(char* errors) {
+    if(strcmp(errors, "pread") == 0){
+        fprintf(stderr, "%s\n", "Error with pread");
+        exit(1);
+    }
+} //just to be safe
 
-struct ext2_super_block superblock;
-unsigned int block_size = 1024;
+char* format_time(uint32_t time) {
+    char* formattedDate = malloc(sizeof(char)*32); //random value
+    time_t rawtime = time;
+    struct tm* info = gmtime(&rawtime);
+    strftime(formattedDate, 32, "%m/%d/%y %H:%M:%S", info);
+    return formattedDate;
+}//referenced from: https://www.tutorialspoint.com/c_standard_library/c_function_gmtime.htm
 
+void scan_free_block_entries(uint32_t freeBlockBitmap, uint32_t numBlocks) {
+    uint32_t i = 0;
+    for(; i < numBlocks; i++){
+        int bit = i & 7; //mask with 7 to get bit number *check with John
+        uint8_t byte = i >> 3; //right shift 3 to convert to byte -> refer to ext2 docs
+        unsigned char read;
+        if(pread(mountFd, &read, sizeof(uint8_t), freeBlockBitmap*blockSize+byte)< 0){
+            print_errors("pread");
+        }
+        int freeCheck = ((read >> bit) & 1);
+        if(freeCheck == 0){
+            fprintf(stdout, "BFREE,%d\n", i+1); //1 indexed
+        }
+    }
+}// bit of 1 means "used" and 0 "free/available" from ext2 documentation
 
-/* returns the offset for a block number */
-unsigned long block_offset(unsigned int block) {
-	return SUPER_OFFSET + (block - 1) * block_size;
-}
+void scan_free_inode_entries(uint32_t freeInodeBitmap, uint32_t numInodes){
+    uint32_t i = 0;
+    for(; i < numInodes; i++){
+        int bit = i & 7;
+        uint8_t byte = i >> 3;
+        unsigned char read;
+        if(pread(mountFd, &read, sizeof(uint8_t), freeInodeBitmap*blockSize+byte)< 0){
+            print_errors("pread");
+        }
+        int freeCheck = ((read >> bit) & 1);
+        if(freeCheck == 0){
+            fprintf(stdout, "IFREE,%d\n", i+1);
+        }
+    }
+}//according to ext2 documentation, bit meanings are similar to block entries
 
-/* store the time in the format mm/dd/yy hh:mm:ss, GMT
- * 'raw_time' is a 32 bit value representing the number of
- * seconds since January 1st, 1970
- */
-void get_time(time_t raw_time, char* buf) {
-	time_t epoch = raw_time;
-	struct tm ts = *gmtime(&epoch);
-	strftime(buf, 80, "%m/%d/%y %H:%M:%S", &ts);
-}
-
-/* given location of directory entry block, produce directory entry summary */
-void read_dir_entry(unsigned int parent_inode, unsigned int block_num) {
-	struct ext2_dir_entry dir_entry;
-	unsigned long offset = block_offset(block_num);
-	unsigned int num_bytes = 0;
-
-	while(num_bytes < block_size) {
-		memset(dir_entry.name, 0, 256);
-		pread(disk_fd, &dir_entry, sizeof(dir_entry), offset + num_bytes);
-		if (dir_entry.inode != 0) { //entry is not empty
-			memset(&dir_entry.name[dir_entry.name_len], 0, 256 - dir_entry.name_len);
-			fprintf(stdout, "DIRENT,%d,%d,%d,%d,%d,'%s'\n",
-				parent_inode, //parent inode number
-				num_bytes, //logical byte offset
-				dir_entry.inode, //inode number of the referenced file
-				dir_entry.rec_len, //entry length
-				dir_entry.name_len, //name length
-				dir_entry.name //name, string, surrounded by single-quotes
-			);
-		}
-		num_bytes += dir_entry.rec_len;
-	}
-}
-
-/* for an allocated inode, print its summary */
-void read_inode(unsigned int inode_table_id, unsigned int index, unsigned int inode_num) {
-	struct ext2_inode inode;
-
-	unsigned long offset = block_offset(inode_table_id) + index * sizeof(inode);
-	pread(disk_fd, &inode, sizeof(inode), offset);
-
-	if (inode.i_mode == 0 || inode.i_links_count == 0) {
-		return;
-	}
-
-	char filetype = '?';
-	//get bits that determine the file type
-	uint16_t file_val = (inode.i_mode >> 12) << 12;
-	if (file_val == 0xa000) { //symbolic link
-		filetype = 's';
-	} else if (file_val == 0x8000) { //regular file
-		filetype = 'f';
-	} else if (file_val == 0x4000) { //directory
-		filetype = 'd';
-	}
-
-	unsigned int num_blocks = 2 * (inode.i_blocks / (2 << superblock.s_log_block_size));
-
-	fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,",
-		inode_num, //inode number
-		filetype, //filetype
-		inode.i_mode & 0xFFF, //mode, low order 12-bits
-		inode.i_uid, //owner
-		inode.i_gid, //group
-		inode.i_links_count //link count
-	);
-
-	char ctime[20], mtime[20], atime[20];
-    	get_time(inode.i_ctime, ctime); //creation time
-    	get_time(inode.i_mtime, mtime); //modification time
-    	get_time(inode.i_atime, atime); //access time
-    	fprintf(stdout, "%s,%s,%s,", ctime, mtime, atime);
-		
-	fprintf(stdout, "%d,%d", 
-	    	inode.i_size, //file size
-		num_blocks //number of blocks
-	);
-
-	unsigned int i;
-	for (i = 0; i < 15; i++) { //block addresses
-		fprintf(stdout, ",%d", inode.i_block[i]);
-	}
-	fprintf(stdout, "\n");
-
-	//if the filetype is a directory, need to create a directory entry
-	for (i = 0; i < 12; i++) { //direct entries
-		if (inode.i_block[i] != 0 && filetype == 'd') {
-			read_dir_entry(inode_num, inode.i_block[i]);
-		}
-	}
-
-	//indirect entry
-	if (inode.i_block[12] != 0) {
-		uint32_t *block_ptrs = malloc(block_size);
-		uint32_t num_ptrs = block_size / sizeof(uint32_t);
-
-		unsigned long indir_offset = block_offset(inode.i_block[12]);
-		pread(disk_fd, block_ptrs, block_size, indir_offset);
-
-		unsigned int j;
-		for (j = 0; j < num_ptrs; j++) {
-			if (block_ptrs[j] != 0) {
-				if (filetype == 'd') {
-					read_dir_entry(inode_num, block_ptrs[j]);
-				}
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-					inode_num, //inode number
-					1, //level of indirection
-					12 + j, //logical block offset
-					inode.i_block[12], //block number of indirect block being scanned
-					block_ptrs[j] //block number of reference block
-				);
-			}
-		}
-		free(block_ptrs);
-	}
-
-	//doubly indirect entry
-	if (inode.i_block[13] != 0) {
-		uint32_t *indir_block_ptrs = malloc(block_size);
-		uint32_t num_ptrs = block_size / sizeof(uint32_t);
-
-		unsigned long indir2_offset = block_offset(inode.i_block[13]);
-		pread(disk_fd, indir_block_ptrs, block_size, indir2_offset);
-
-		unsigned int j;
-		for (j = 0; j < num_ptrs; j++) {
-			if (indir_block_ptrs[j] != 0) {
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-					inode_num, //inode number
-					2, //level of indirection
-					256 + 12 + j, //logical block offset
-					inode.i_block[13], //block number of indirect block being scanned
-					indir_block_ptrs[j] //block number of reference block
-				);
-
-				//search through this indirect block to find its directory entries
-				uint32_t *block_ptrs = malloc(block_size);
-				unsigned long indir_offset = block_offset(indir_block_ptrs[j]);
-				pread(disk_fd, block_ptrs, block_size, indir_offset);
-
-				unsigned int k;
-				for (k = 0; k < num_ptrs; k++) {
-					if (block_ptrs[k] != 0) {
-						if (filetype == 'd') {
-							read_dir_entry(inode_num, block_ptrs[k]);
-						}
-						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-							inode_num, //inode number
-							1, //level of indirection
-							256 + 12 + k, //logical block offset
-					 		indir_block_ptrs[j], //block number of indirect block being scanned
-							block_ptrs[k] //block number of reference block
-						);
-					}
-				}
-				free(block_ptrs);
-			}
-		}
-		free(indir_block_ptrs);
-	}
-
-	//triply indirect entry
-	if (inode.i_block[14] != 0) {
-		uint32_t *indir2_block_ptrs = malloc(block_size);
-		uint32_t num_ptrs = block_size / sizeof(uint32_t);
-
-		unsigned long indir3_offset = block_offset(inode.i_block[14]);
-		pread(disk_fd, indir2_block_ptrs, block_size, indir3_offset);
-
-		unsigned int j;
-		for (j = 0; j < num_ptrs; j++) {
-			if (indir2_block_ptrs[j] != 0) {
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-					inode_num, //inode number
-					3, //level of indirection
-					65536 + 256 + 12 + j, //logical block offset
-					inode.i_block[14], //block number of indirect block being scanned
-					indir2_block_ptrs[j] //block number of reference block
-				);
-
-				uint32_t *indir_block_ptrs = malloc(block_size);
-				unsigned long indir2_offset = block_offset(indir2_block_ptrs[j]);
-				pread(disk_fd, indir_block_ptrs, block_size, indir2_offset);
-
-				unsigned int k;
-				for (k = 0; k < num_ptrs; k++) {
-					if (indir_block_ptrs[k] != 0) {
-						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-							inode_num, //inode number
-							2, //level of indirection
-							65536 + 256 + 12 + k, //logical block offset
-				 			indir2_block_ptrs[j], //block number of indirect block being scanned
-							indir_block_ptrs[k] //block number of reference block	
-						);	
-						uint32_t *block_ptrs = malloc(block_size);
-						unsigned long indir_offset = block_offset(indir_block_ptrs[k]);
-						pread(disk_fd, block_ptrs, block_size, indir_offset);
-
-						unsigned int l;
-						for (l = 0; l < num_ptrs; l++) {
-							if (block_ptrs[l] != 0) {
-								if (filetype == 'd') {
-									read_dir_entry(inode_num, block_ptrs[l]);
-								}
-								fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-									inode_num, //inode number
-									1, //level of indirection
-									65536 + 256 + 12 + l, //logical block offset
-				 					indir_block_ptrs[k], //block number of indirect block being scanned
-									block_ptrs[l] //block number of reference block	
-								);
-							}
-						}
-						free(block_ptrs);
-					}
-				}
-				free(indir_block_ptrs);
-			}
-		}
-		free(indir2_block_ptrs);
-	}
+void print_superblock_summary() {
+    if(pread(mountFd, &sb, sizeof(struct ext2_super_block), SB_OFFSET) < 0){
+        print_errors("pread");
+    }
+    uint32_t numBlocks = sb.s_blocks_count;
+    uint32_t numInodes = sb.s_inodes_count;
+    blockSize = EXT2_MIN_BLOCK_SIZE << sb.s_log_block_size;
+    inodeSize = sb.s_inode_size;
+    uint32_t blocksPerGroup = sb.s_blocks_per_group;
+    uint32_t inodesPerGroup = sb.s_inodes_per_group;
+    uint32_t firstNonReserved = sb.s_first_ino;
+    fprintf(stdout, "SUPERBLOCK,%u,%u,%u,%u,%u,%u,%u\n", numBlocks, numInodes, blockSize, inodeSize, blocksPerGroup, inodesPerGroup, firstNonReserved);
 }
 
 
-void superblock_summary() {
-	pread(disk_fd, &superblock, sizeof(superblock), SUPER_OFFSET);
-	block_size = EXT2_MIN_BLOCK_SIZE << superblock.s_log_block_size;
-	fprintf(stdout, "SUPERBLOCK,%d,%d,%d,%d,%d,%d,%d\n", superblock.s_blocks_count, superblock.s_inodes_count, block_size, superblock.s_inode_size, superblock.s_blocks_per_group, superblock.s_inodes_per_group, superblock.s_first_ino);
-
-}
-
-void free_block_enties(int group_num, uint32_t block_bitmap){
-	char* block = (char*) malloc(block_size);
-	unsigned int num_free_block = superblock.s_first_data_block + group_num * superblock.s_blocks_per_group;
-	pread(disk_fd, block, block_size, SUPER_OFFSET + (block_bitmap - 1) * block_size);
-
-	unsigned int i, j;
-	for (i = 0; i < block_size; i++) {
-		char data = block[i];
-		for (j = 0; j < 8; j++) {
-			// if not used
-			if (!(1 & data)) {
-				fprintf(stdout, "BFREE,%d\n", num_free_block);
-			}
-			data = data >> 1;
-			num_free_block++;
-		}
-	}
-	free(block);
-}
-
-void free_inode_entries(int group_num, uint32_t inode_bitmap, uint32_t inode_table){
-	int num_bytes = superblock.s_inodes_per_group / 8;
-	char* bytes = (char*) malloc(num_bytes);
-
-	unsigned long offset = SUPER_OFFSET + (inode_bitmap - 1) * block_size;
-	unsigned int num_free_inode = group_num * superblock.s_inodes_per_group + 1;
-	unsigned int start = num_free_inode;
-	pread(disk_fd, bytes, num_bytes, offset);
-
-	int i, j;
-	for (i = 0; i < num_bytes; i++) {
-		char data = bytes[i];
-		for (j = 0; j < 8; j++) {
-			int used = 1 & data;
-			if (used) { //inode is allocated
-				read_inode(inode_table, num_free_inode - start, num_free_inode);
-			} else { //free inode
-				fprintf(stdout, "IFREE,%d\n", num_free_inode);
-			}
-			data = data >> 1;
-			num_free_inode++;
-		}
-	}
-	free(bytes);
-}
-
-void group_summary(int group_num, int num_group) {
-	struct ext2_group_desc group_desc;
-	pread(disk_fd, &group_desc, sizeof(struct ext2_group_desc), SUPER_OFFSET + sizeof(struct ext2_super_block));
-
-	int num_block = (group_num == num_group - 1 ? superblock.s_blocks_count - (superblock.s_blocks_per_group * (num_group - 1)) : superblock.s_blocks_per_group);
-	int num_inode = (group_num == num_group - 1 ? superblock.s_inodes_count - (superblock.s_inodes_per_group * (num_group - 1)) : superblock.s_inodes_per_group);
-
-	fprintf(stdout, "GROUP,%d,%d,%d,%d,%d,%d,%d,%d\n", group_num, num_block, num_inode, group_desc.bg_free_blocks_count, group_desc.bg_free_inodes_count, group_desc.bg_block_bitmap, group_desc.bg_inode_bitmap, group_desc.bg_inode_table);
-
-	free_block_enties(group_num, group_desc.bg_block_bitmap);
-	free_inode_entries(group_num, group_desc.bg_inode_bitmap, group_desc.bg_inode_table);
-}
-
-int main(int argc, char const *argv[])
+void printDirectoryEntries(uint32_t starting, uint32_t parentNum)
 {
-	if(argc != 2){
-		fprintf(stderr, "%s\n", "Incorrect arguments");
-		exit(1);
-	}
-	if((disk_fd = open(argv[1], O_RDONLY)) < 0)
-	{
-		fprintf(stderr, "%s\n", "Could not mount" );
-		exit(2);
-	}
-	superblock_summary();
-	int num_group = superblock.s_blocks_count / superblock.s_blocks_per_group;
-	int i;
-	for (i = 0; i < num_group; i++){
-		group_summary(i, num_group);
-	}
 
-	return 0;
+    uint32_t current = starting;
+    while(current < starting + blockSize)
+    {
+        if(pread(mountFd, &dir, sizeof(struct ext2_dir_entry), current) < 0) print_errors("pread");
+        uint32_t parent = parentNum, logical = current - starting, inodeNumber = dir.inode, entryLength = dir.rec_len, nameLength = dir.name_len;
+        current += entryLength;
+        if(inodeNumber == 0)
+            continue;
+        fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'", parent, logical, inodeNumber, entryLength, nameLength);
+        for(uint32_t i = 0; i < nameLength; i++)
+            fprintf(stdout, "%c", dir.name[i]);
+        fprintf(stdout, "'\n");
+    }
+
+}
+
+void dL0(int inodeOffSet, int parentNum)
+{
+    int ib;
+    for(uint32_t j = 0; j < 12; j++)
+    {
+        if(pread(mountFd, &ib, 4, inodeOffSet + 40 + j * 4) < 0) print_errors("pread");
+        if(ib != 0)
+        {
+            int curOffset = blockSize * ib;
+            printDirectoryEntries(curOffset, parentNum);
+        }   
+    }
+}
+void dL1(int inodeOffSet, int parentNum)
+{
+    int indir1, ib;
+    if(pread(mountFd, &indir1, 4, inodeOffSet + 40 + 48) < 0) print_errors("pread");
+    if(indir1 != 0)
+    {
+        for(uint32_t j = 0; j < blockSize /4; j++)
+        {
+            if(pread(mountFd,&ib, 4, blockSize * indir1 + j * 4) < 0) print_errors("pread");
+            int curOffset = blockSize * ib;
+            if(ib != 0)
+            {
+                printDirectoryEntries(curOffset, parentNum);           
+            }   
+        }
+    }
+}
+void dL2(int inodeOffSet, int parentNum)
+{
+    int indir2, indir1, ib;
+    if(pread(mountFd, &indir2, 4, inodeOffSet + 40 + 52) < 0) print_errors("pread");
+    if(indir2 != 0)
+    {
+        for(uint32_t k = 0; k < blockSize /4; k++)
+        {
+            if(pread(mountFd, &indir1, 4, indir2 * blockSize + k * 4) < 0) print_errors("pread");
+            if(indir1 != 0)
+            {
+                for(uint32_t j = 0; j < blockSize /4; j++)
+                {
+                    
+                    if(pread(mountFd, &ib, 4, blockSize * indir1 + j * 4) < 0) print_errors("pread");
+                    int curOffset = blockSize * ib;
+                    if(ib != 0)
+                        printDirectoryEntries(curOffset, parentNum);
+                }
+            }
+        }
+    }
+}
+void dL3(int inodeOffSet, int parentNum)
+{
+    int indir3, indir2, indir1, ib;
+    if(pread(mountFd,&indir3, 4, inodeOffSet + 40 + 56) < 0) print_errors("pread");
+    if(indir3 != 0)
+    {
+        for(uint32_t m = 0; m < blockSize / 4; m++)
+        {
+            if(pread(mountFd,&indir2, 4, indir3 * blockSize + m * 4) < 0) print_errors("pread");
+            if(indir2 != 0)
+            {
+                for(uint32_t k = 0; k < blockSize /4; k++)
+                {
+                    if(pread(mountFd,&indir1, 4, indir2 * blockSize + k * 4) < 0) print_errors("pread");
+                    if(indir1 != 0)
+                    {
+                        for(uint32_t j = 0; j < blockSize /4; j++)
+                        {
+                            
+                            if(pread(mountFd, &ib, 4, blockSize * indir1 + j * 4) < 0) print_errors("pread");
+                            int curOffset = blockSize * ib;
+                            if(ib != 0)
+                                printDirectoryEntries(curOffset, parentNum);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void print_inode_Directory_Summary(struct ext2_inode in, uint32_t offset, int num)
+{
+        //LOL my turn for unused parameter
+        (void) in;
+        dL0(offset, num);
+        dL1(offset, num);
+        dL2(offset, num);
+        dL3(offset, num);
+}
+
+void indirectL1(uint32_t inodeNumber, uint32_t blockNumber)
+{
+    uint32_t blockOffset = blockNumber * blockSize;
+    uint32_t blockValue;
+    for(uint32_t i = 0; i < blockSize / 4; i++)
+    {
+        if(pread(mountFd, &blockValue, sizeof(blockValue), blockOffset + i * 4) < 0) print_errors("pread");
+        if(blockValue != 0)
+            fprintf(stdout, "INDIRECT,%u,%u,%u,%u,%u\n", inodeNumber, 1, 12 + i, blockNumber, blockValue);
+    }
+}
+void indirectL2(uint32_t inodeNumber, uint32_t blockNumberOfIndirectL2)
+{
+    uint32_t blockOffsetL1Indirect = blockNumberOfIndirectL2 * blockSize, blockOffset;
+    uint32_t blockValueL1Indirect, blockValue;
+    for(uint32_t i = 0; i < blockSize / 4; i++)
+    {
+        if(pread(mountFd, &blockValueL1Indirect, sizeof(blockValue), blockOffsetL1Indirect + i * 4) < 0) print_errors("pread");
+
+        blockOffset = blockValueL1Indirect * blockSize;
+        if(blockValueL1Indirect != 0)
+        {
+            fprintf(stdout, "INDIRECT,%u,%u,%u,%u,%u\n", inodeNumber, 2, 12 + blockSize / 4 + i * blockSize / 4, blockNumberOfIndirectL2, blockValueL1Indirect);
+            for(uint32_t j = 0; j < blockSize / 4; j++)
+            {
+                if(pread(mountFd, &blockValue, sizeof(blockValue), blockOffset + j * 4) < 0) print_errors("pread");
+                if(blockValue != 0)
+                    fprintf(stdout, "INDIRECT,%u,%u,%u,%u,%u\n", inodeNumber, 1, 12 + blockSize / 4 + i * blockSize / 4 + j, blockValueL1Indirect, blockValue);
+            }
+        }
+    }
+}
+void indirectL3(uint32_t inodeNumber, uint32_t blockNumberOfIndirectL3)
+{
+    uint32_t blockOffsetL3 = blockNumberOfIndirectL3 * blockSize;
+    uint32_t blocksSeenThusFar = 12 + blockSize / 4 + blockSize / 4 * blockSize / 4;
+    for(uint32_t i = 0; i < blockSize / 4; i++)
+    {
+        //Read each entry in L3
+        uint32_t blockOffsetL2, blockNumberIndirectL2;
+        if(pread(mountFd, &blockNumberIndirectL2, sizeof(blockNumberIndirectL2), blockOffsetL3 + i * 4) < 0) print_errors("pread");
+        blockOffsetL2 = blockNumberIndirectL2 * blockSize;
+        if(blockNumberIndirectL2 != 0)
+        {
+            fprintf(stdout, "INDIRECT,%u,%u,%u,%u,%u\n", inodeNumber, 3, blocksSeenThusFar + i * (blockSize * blockSize / 8), blockNumberOfIndirectL3, blockNumberIndirectL2);
+            for(uint32_t j = 0; j < blockSize / 4; j++)
+            {
+                //Read each entry in L2
+                uint32_t blockOffsetL1, blockNumberIndirectL1;
+                if(pread(mountFd, &blockNumberIndirectL1, sizeof(blockNumberIndirectL1), blockOffsetL2 + j * 4) < 0) print_errors("pread");
+                blockOffsetL1 = blockNumberIndirectL1 * blockSize;
+                if(blockNumberIndirectL1 != 0)
+                {
+                    fprintf(stdout, "INDIRECT,%u,%u,%u,%u,%u\n", inodeNumber, 2, blocksSeenThusFar + i * (blockSize * blockSize / 8) + j * (blockSize / 4), blockNumberIndirectL2, blockNumberIndirectL1);
+                    for(uint32_t k = 0; k < blockSize / 4; k++)
+                    {
+                        uint32_t dataBlockNumber;
+                        if(pread(mountFd, &dataBlockNumber, sizeof(dataBlockNumber), blockOffsetL1 + k * 4) < 0) print_errors("pread");
+                        if(dataBlockNumber != 0)
+                            fprintf(stdout, "INDIRECT,%u,%u,%u,%u,%u\n", inodeNumber, 1, blocksSeenThusFar + i *(blockSize * blockSize / 8) + j * (blockSize / 4) + k, blockNumberIndirectL1, dataBlockNumber);
+
+                    }
+                }
+            }
+        }
+    }
+}
+
+void print_inode_summary(uint32_t firstBlockInode, uint32_t numInodes, uint32_t freeInodeBitmap) {
+    //Hack to compile clean, did you want this parameter Luca?
+    (void) firstBlockInode;
+
+
+
+    uint32_t i = 0;
+    uint32_t j = 0;
+    char fileType = '?';
+    //printf("here");
+    for(; i < numInodes; i++){
+        //NOTE: CHECK TO SEE IF ALLOCATED!!!!
+        int bit = i & 7;
+        uint8_t byte = i >> 3;
+        unsigned char read;
+        if(pread(mountFd, &read, sizeof(uint8_t), freeInodeBitmap*blockSize+byte)< 0){
+            print_errors("pread");
+        }
+        int freeCheck = ((read >> bit) & 1);
+        if(freeCheck == 0)
+           (void)i;// continue;
+        //ALLOCATED
+        //uint32_t inodeOffset = 1024 +  (firstBlockInode - 1) * (blockSize) + i * sizeof(struct ext2_inode);
+        if(pread(mountFd, &inode, inodeSize, 1024 +  (firstBlockInode - 1) * (blockSize) + i * sizeof(struct ext2_inode)) < 0){
+            print_errors("pread");
+        }//offset is wherever the imap starts * blockSize + the inode number we are currently on
+        if(inode.i_mode == 0 || inode.i_links_count == 0){
+            continue;
+        }
+        if((inode.i_mode & 0xF000) == 0xA000){
+            fileType = 's';
+        }
+        else if((inode.i_mode & 0xF000) == 0x8000){
+            fileType = 'f';
+        }
+        else if((inode.i_mode & 0xF000) == 0x4000){
+            fileType = 'd';
+            //We note that this is where there is a directory....
+            print_inode_Directory_Summary(inode, 1024 +  (firstBlockInode - 1) * (blockSize) + i * sizeof(struct ext2_inode), i + 1);
+        }
+        uint16_t imode = inode.i_mode & 0xFFF; ///& 0xFFF gives lower 12 bits https://cboard.cprogramming.com/cplusplus-programming/98577-how-do-i-get-lower-12-bits-32-bit-int.html
+        uint16_t owner = inode.i_uid;
+        uint16_t group = inode.i_gid;
+        uint16_t linksCount = inode.i_links_count;
+        char* changeDate = format_time(inode.i_ctime);
+        char* modificationDate = format_time(inode.i_mtime);
+        char* accessDate = format_time(inode.i_atime);
+        uint32_t fileSize = inode.i_size;
+        uint32_t numBlocks = inode.i_blocks; //should contain same value as the i_blocks field according to spec
+        fprintf(stdout, "INODE,%d,%c,%o,%u,%u,%u,%s,%s,%s,%d,%d", i + 1, fileType, imode, owner, group, linksCount, changeDate, modificationDate, accessDate, fileSize, numBlocks);
+        if(!(fileType == 's' && fileSize < 60))
+            for(j = 0; j < 15; j++){
+                fprintf(stdout, ",%u", inode.i_block[j]);
+            }
+        else
+            fprintf(stdout, ",%u", inode.i_block[0]);
+        fprintf(stdout,"\n");
+
+        if(!(fileType == 's' && fileSize < 60))
+        {
+                //LETS DEAL WITH INDIRECTS
+                //uint32_t indirectL1BlockNum = 0;
+                if(inode.i_block[12] != 0)
+                    indirectL1(i + 1, inode.i_block[12]);
+                if(inode.i_block[13] != 0)
+                    indirectL2(i + 1, inode.i_block[13]);
+                if(inode.i_block[14] != 0)
+                    indirectL3(i + 1, inode.i_block[14]);
+
+
+        }
+    }
+    
+} //first non-reserved inode is 11 -> check later
+
+void print_group_summary() {
+    if(pread(mountFd, &group, sizeof(struct ext2_group_desc), SB_OFFSET + sizeof(struct ext2_super_block)) < 0){
+        print_errors("pread");
+    } // according to the documentation, the block group descriptor table starts right after the superblock
+    uint32_t numBlocks = sb.s_blocks_count;
+    uint32_t numInodes = sb.s_inodes_count;
+    uint16_t numFreeBlocks = group.bg_free_blocks_count;
+    uint16_t numFreeInodes = group.bg_free_inodes_count;
+    uint32_t freeBlockBitmap = group.bg_block_bitmap;
+    uint32_t freeInodeBitmap = group.bg_inode_bitmap;
+    uint32_t firstBlockInode = group.bg_inode_table;
+    fprintf(stdout, "GROUP,0,%u,%u,%u,%u,%u,%u,%u\n", numBlocks, numInodes, numFreeBlocks, numFreeInodes, freeBlockBitmap, freeInodeBitmap, firstBlockInode);//according to spec, we can assume that there will be only one group
+    scan_free_block_entries(freeBlockBitmap, numBlocks);
+    scan_free_inode_entries(freeInodeBitmap, numInodes);
+    print_inode_summary(firstBlockInode, numInodes, freeInodeBitmap);
+}
+
+int main(int argc, char** argv){
+    if(argc != 2){
+        fprintf(stderr, "%s\n", "Incorrect arguments");
+        exit(1);
+    }
+    if((mountFd = open(argv[1], O_RDONLY)) < 0)
+    {
+        fprintf(stderr, "%s\n", "Could not mount" );
+        exit(2);
+    }
+    print_superblock_summary();
+    print_group_summary();
 }

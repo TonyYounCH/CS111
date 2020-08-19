@@ -87,80 +87,51 @@ void free_block_enties(uint32_t block_bitmap, int group_num){
 void single_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
 
 	if (inode.i_block[12] != 0) {
-		// uint32_t *block = malloc(block_size);
-
-		// uint32_t indir_offset = block_offset(inode.i_block[12]);
-		// pread(disk_fd, block, block_size, indir_offset);
-
-		uint32_t blockOffset = inode.i_block[12] * block_size;
-		uint32_t blockValue;		
+		uint32_t offset = inode.i_block[12] * block_size;
+		uint32_t block;		
 
 		uint32_t i;
 		for (i = 0; i < block_size / sizeof(uint32_t); i++) {
-			pread(disk_fd, &blockValue, sizeof(uint32_t), blockOffset + i * 4);
-			if (blockValue != 0) {
+			pread(disk_fd, &block, sizeof(uint32_t), offset + i * 4);
+			if (block != 0) {
 				if (file_type == 'd') {
-					directory_entries(num_free_inode, blockValue);
+					directory_entries(num_free_inode, block);
 				}
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-					num_free_inode, //inode number
-					1, //level of indirection
-					12 + i, //logical block offset
-					inode.i_block[12], //block number of indirect block being scanned
-					blockValue //block number of reference block
-				);
+				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, 12 + i, inode.i_block[12], block);
 			}
 		}
-		// free(block);
 	}
 
 }
 
 void double_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
 
-	//doubly indirect entry
 	if (inode.i_block[13] != 0) {
-		uint32_t *indir_block_ptrs = malloc(block_size);
-		uint32_t num_ptrs = block_size / sizeof(uint32_t);
+		uint32_t offset = inode.i_block[13] * block_size;
+		uint32_t block;		
 
-		uint32_t indir2_offset = block_offset(inode.i_block[13]);
-		pread(disk_fd, indir_block_ptrs, block_size, indir2_offset);
+		uint32_t blockOffset;
+		uint32_t blockValue;
 
+		uint32_t i;
 		uint32_t j;
-		for (j = 0; j < num_ptrs; j++) {
-			if (indir_block_ptrs[j] != 0) {
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-					num_free_inode, //inode number
-					2, //level of indirection
-					256 + 12 + j, //logical block offset
-					inode.i_block[13], //block number of indirect block being scanned
-					indir_block_ptrs[j] //block number of reference block
-				);
-
-				//search through this indirect block to find its directory entries
-				uint32_t *block_ptrs = malloc(block_size);
-				uint32_t indir_offset = block_offset(indir_block_ptrs[j]);
-				pread(disk_fd, block_ptrs, block_size, indir_offset);
-
-				uint32_t k;
-				for (k = 0; k < num_ptrs; k++) {
-					if (block_ptrs[k] != 0) {
+		for (i = 0; i < block_size / sizeof(uint32_t); i++) {
+			pread(disk_fd, &block, sizeof(uint32_t), offset + i * 4);
+			if (block != 0) {
+				blockOffset = block * block_size;
+				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 2, (int) (block_size / sizeof(uint32_t)) + 12 + i, inode.i_block[13], block);
+				for (j = 0; j < block_size / sizeof(uint32_t); j++){
+					pread(disk_fd, &blockValue, sizeof(uint32_t), blockOffset + j * 4);
+					if(blockValue != 0) {
 						if (file_type == 'd') {
-							directory_entries(num_free_inode, block_ptrs[k]);
+							directory_entries(num_free_inode, blockValue);
 						}
-						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
-							num_free_inode, //inode number
-							1, //level of indirection
-							256 + 12 + k, //logical block offset
-							indir_block_ptrs[j], //block number of indirect block being scanned
-							block_ptrs[k] //block number of reference block
-						);
+						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, (int) (block_size / sizeof(uint32_t)) + 12 + j, block, blockValue);
+
 					}
 				}
-				free(block_ptrs);
 			}
 		}
-		free(indir_block_ptrs);
 	}
 
 }

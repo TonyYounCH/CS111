@@ -374,10 +374,14 @@ int main(int argc, char const *argv[])
 	}
 	block_size = EXT2_MIN_BLOCK_SIZE << superblock.s_log_block_size;
 	read_superblock();
-	int num_group = superblock.s_blocks_count / superblock.s_blocks_per_group;
-	int i;
-	for (i = 0; i < num_group; i++){
-		read_group(i, num_group);
+	int num_groups = superblock.s_blocks_count / superblock.s_blocks_per_group;
+	if ((double) num_groups < (double) superblock.s_blocks_count / superblock.s_blocks_per_group) {
+		num_groups++;
+	}
+	//fprintf(stderr, "%d", num_groups);
+	int i; 
+	for (i = 0; i < num_groups; i++) {
+		read_group(i, num_groups);
 	}
 
 	return 0;

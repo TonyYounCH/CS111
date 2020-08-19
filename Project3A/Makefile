@@ -5,8 +5,8 @@
 default:
 	gcc -g -Wall -Wextra lab3a.c -o lab3a
 
-dist:
+dist: default
 	tar -czvf lab3a-304207830.tar.gz lab3a.c Makefile README ext2_fs.h
 
 clean:
-	rm -f *.o lab4b *.txt *.tar.gz
+	rm -f *.o lab3a *.txt *.tar.gz

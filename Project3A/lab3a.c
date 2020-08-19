@@ -143,14 +143,14 @@ void tripple_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, ch
 			pread(disk_fd, &indr1_block, sizeof(uint32_t), indr1_offset + i * sizeof(uint32_t));
 			if (indr1_block != 0) {
 				indr_offset = indr1_block * block_size;
-				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 3, 65536 + (int) (block_size / sizeof(uint32_t)) + 12 + i, inode.i_block[14], indr1_block);
+				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 3, (int) (blockSize * blockSize / 8) + (int) (block_size / sizeof(uint32_t)) + 12 + i, inode.i_block[14], indr1_block);
 
 				uint32_t offset, block;
 				for (j = 0; j < block_size / sizeof(uint32_t); j++){
 					pread(disk_fd, &indr_block, sizeof(uint32_t), indr_offset + j * sizeof(uint32_t));
 					if(indr_block != 0) {
 						offset = indr_block * block_size;
-						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 2, 65536 + (int) (block_size / sizeof(uint32_t)) + 12 + j, indr1_block, indr_block);
+						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 2, (int) (blockSize * blockSize / 8) + (int) (block_size / sizeof(uint32_t)) + 12 + j, indr1_block, indr_block);
 
 						for (k = 0; k < block_size / sizeof(uint32_t); k++){
 							pread(disk_fd, &block, sizeof(uint32_t), offset + k * sizeof(uint32_t));
@@ -158,7 +158,7 @@ void tripple_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, ch
 								if (file_type == 'd') {
 									directory_entries(num_free_inode, block);
 								}
-								fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, 65536 + (int) (block_size / sizeof(uint32_t)) + 12 + k, indr_block, block);
+								fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n", num_free_inode, 1, (int) (blockSize * blockSize / 8) + (int) (block_size / sizeof(uint32_t)) + 12 + k, indr_block, block);
 							}
 						}
 					}
@@ -206,7 +206,7 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 	}
 	fprintf(stdout, "\n");
 
-	// point directly to the first 12 data blocks of the file
+	// i_block[0..11] point directly to the first 12 data blocks of the file
 	for (i = 0; i < 12; i++) {
 		if (inode.i_block[i] != 0 && file_type == 'd') {
 			directory_entries(num_free_inode, inode.i_block[i]);

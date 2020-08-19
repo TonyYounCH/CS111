@@ -4,7 +4,6 @@ EMAIL: tonyyoun2@gmail.com
 ID: 304207830
 */
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -334,7 +333,7 @@ int main(int argc, char const *argv[])
 		exit(2);
 	}
 	superblock_summary();
-	int num_group = (int) ceil(superblock.s_blocks_count / superblock.s_blocks_per_group);
+	int num_group = superblock.s_blocks_count / superblock.s_blocks_per_group + 1;
 	int i;
 	for (i = 0; i < num_group; i++){
 		group_summary(i, num_group);

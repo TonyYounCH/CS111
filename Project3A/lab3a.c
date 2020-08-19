@@ -49,7 +49,7 @@ void directory_entries(uint32_t parent_inode, uint32_t block_num)
     while(current < starting + block_size)
     {
         pread(disk_fd, &dir, sizeof(struct ext2_dir_entry), current);
-        uint32_t parent = parentNum, logical = current - starting, inodeNumber = dir.inode, entryLength = dir.rec_len, nameLength = dir.name_len;
+        uint32_t parent = parent_inode, logical = current - starting, inodeNumber = dir.inode, entryLength = dir.rec_len, nameLength = dir.name_len;
         current += entryLength;
         if(inodeNumber == 0)
             continue;

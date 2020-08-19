@@ -32,16 +32,16 @@ unsigned long block_offset(unsigned int block) {
 	return SUPER_OFFSET + (block - 1) * block_size;
 }
 
-char* format_time(uint32_t time) {
-	char* formattedDate = malloc(sizeof(char)*32);
-	time_t rawtime = time;
-	struct tm* info = gmtime(&rawtime);
-	strftime(formattedDate, 32, "%m/%d/%y %H:%M:%S", info);
-	return formattedDate;
+char* get_time(time_t time) {
+	char* time_format = malloc(sizeof(char)*32);
+	time_t epoch = time;
+	struct tm ts = *gmtime(&epoch);
+	strftime(time_format, 32, "%m/%d/%y %H:%M:%S", &ts);
+	return time_format;
 }
 
 /* given location of directory entry block, produce directory entry summary */
-void read_dir_entry(unsigned int parent_inode, unsigned int block_num) {
+void directory_entries(unsigned int parent_inode, unsigned int block_num) {
 	struct ext2_dir_entry dir_entry;
 	unsigned long offset = block_offset(block_num);
 	unsigned int num_bytes = 0;
@@ -92,53 +92,8 @@ void free_block_enties(uint32_t block_bitmap, int group_num){
 	free(block);
 }
 
-void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
-	struct ext2_inode inode;
+void single_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
 
-	uint32_t offset = SUPER_OFFSET + (inode_table - 1) * block_size + sizeof(struct ext2_inode) * index;
-	pread(disk_fd, &inode, sizeof(struct ext2_inode), offset);
-
-	if (inode.i_mode == 0 || inode.i_links_count == 0) {
-		return;
-	}
-
-	char file_type = '?';
-
-	uint16_t file_bit = inode.i_mode & 0xF000;
-	if (file_bit == EXT2_FILE) {
-		file_type = 'f';
-	} else if (file_bit == EXT2_DIR) { 
-		file_type = 'd';
-	} else if (file_bit == EXT2_SYM) {
-		file_type = 's';
-	}
-
-	uint16_t imode = inode.i_mode & 0xFFF;
-	uint16_t owner = inode.i_uid;
-	uint16_t group = inode.i_gid;
-	uint16_t link_count = inode.i_links_count;
-	char* ctime = format_time(inode.i_ctime);
-	char* mtime = format_time(inode.i_mtime);
-	char* atime = format_time(inode.i_atime);
-	uint32_t file_size = inode.i_size;
-	uint32_t num_blocks = inode.i_blocks;
-	fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d", num_free_inode, file_type, imode, owner, group, link_count, ctime, mtime, atime, file_size, num_blocks);
-
-
-	uint32_t i;
-	for (i = 0; i < 15; i++) { //block addresses
-		fprintf(stdout, ",%d", inode.i_block[i]);
-	}
-	fprintf(stdout, "\n");
-
-	//if the file_type is a directory, need to create a directory entry
-	for (i = 0; i < 12; i++) { //direct entries
-		if (inode.i_block[i] != 0 && file_type == 'd') {
-			read_dir_entry(num_free_inode, inode.i_block[i]);
-		}
-	}
-
-	//indirect entry
 	if (inode.i_block[12] != 0) {
 		uint32_t *block_ptrs = malloc(block_size);
 		uint32_t num_ptrs = block_size / sizeof(uint32_t);
@@ -150,7 +105,7 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 		for (j = 0; j < num_ptrs; j++) {
 			if (block_ptrs[j] != 0) {
 				if (file_type == 'd') {
-					read_dir_entry(num_free_inode, block_ptrs[j]);
+					directory_entries(num_free_inode, block_ptrs[j]);
 				}
 				fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
 					num_free_inode, //inode number
@@ -163,6 +118,10 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 		}
 		free(block_ptrs);
 	}
+
+}
+
+void double_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
 
 	//doubly indirect entry
 	if (inode.i_block[13] != 0) {
@@ -192,7 +151,7 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 				for (k = 0; k < num_ptrs; k++) {
 					if (block_ptrs[k] != 0) {
 						if (file_type == 'd') {
-							read_dir_entry(num_free_inode, block_ptrs[k]);
+							directory_entries(num_free_inode, block_ptrs[k]);
 						}
 						fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
 							num_free_inode, //inode number
@@ -208,6 +167,10 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 		}
 		free(indir_block_ptrs);
 	}
+
+}
+
+void tripple_indirect_block(struct ext2_inode inode, uint32_t num_free_inode, char file_type) {
 
 	//triply indirect entry
 	if (inode.i_block[14] != 0) {
@@ -250,7 +213,7 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 						for (l = 0; l < num_ptrs; l++) {
 							if (block_ptrs[l] != 0) {
 								if (file_type == 'd') {
-									read_dir_entry(num_free_inode, block_ptrs[l]);
+									directory_entries(num_free_inode, block_ptrs[l]);
 								}
 								fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
 									num_free_inode, //inode number
@@ -269,6 +232,59 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 		}
 		free(indir2_block_ptrs);
 	}
+
+}
+void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
+	struct ext2_inode inode;
+
+	uint32_t offset = SUPER_OFFSET + (inode_table - 1) * block_size + sizeof(struct ext2_inode) * index;
+	pread(disk_fd, &inode, sizeof(struct ext2_inode), offset);
+
+	if (inode.i_mode == 0 || inode.i_links_count == 0) {
+		return;
+	}
+
+	char file_type = '?';
+
+	uint16_t file_bit = inode.i_mode & 0xF000;
+	if (file_bit == EXT2_FILE) {
+		file_type = 'f';
+	} else if (file_bit == EXT2_DIR) { 
+		file_type = 'd';
+	} else if (file_bit == EXT2_SYM) {
+		file_type = 's';
+	}
+
+	uint16_t imode = inode.i_mode & 0xFFF;
+	uint16_t owner = inode.i_uid;
+	uint16_t group = inode.i_gid;
+	uint16_t link_count = inode.i_links_count;
+	char* ctime = get_time(inode.i_ctime);
+	char* mtime = get_time(inode.i_mtime);
+	char* atime = get_time(inode.i_atime);
+	uint32_t file_size = inode.i_size;
+	uint32_t num_blocks = inode.i_blocks;
+	fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d", num_free_inode, file_type, imode, owner, group, link_count, ctime, mtime, atime, file_size, num_blocks);
+
+	uint32_t i;
+	for (i = 0; i < 15; i++) {
+		// block address
+		fprintf(stdout, ",%d", inode.i_block[i]);
+	}
+	fprintf(stdout, "\n");
+
+	//if the file_type is a directory, need to create a directory entry
+	for (i = 0; i < 12; i++) {
+		if (inode.i_block[i] != 0 && file_type == 'd') {
+			directory_entries(num_free_inode, inode.i_block[i]);
+		}
+	}
+
+	single_indirect_block(inode, num_free_inode, file_type);
+	double_indirect_block(inode, num_free_inode, file_type);
+	tripple_indirect_block(inode, num_free_inode, file_type);
+
+
 }
 
 void free_inode_entries(uint32_t inode_bitmap, uint32_t inode_table, int group_num){

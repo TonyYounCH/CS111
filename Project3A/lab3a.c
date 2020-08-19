@@ -334,8 +334,8 @@ int main(int argc, char const *argv[])
 	}
 	superblock_summary();
 	int num_group = superblock.s_blocks_count / superblock.s_blocks_per_group;
-	if ((double) num_groups < (double) superblock.s_blocks_count / superblock.s_blocks_per_group) {
-		num_groups++;
+	if ((double) num_group < (double) superblock.s_blocks_count / superblock.s_blocks_per_group) {
+		num_group++;
 	}
 	int i;
 	for (i = 0; i < num_group; i++){

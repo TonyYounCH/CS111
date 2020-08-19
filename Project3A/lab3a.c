@@ -14,57 +14,20 @@ ID: 304207830
 #include <stdint.h>
 #include <time.h>
 #include <getopt.h>
-
 #include "ext2_fs.h"
 
 #define SUPER_OFFSET 1024
 
+
 int disk_fd;
 
 struct ext2_super_block superblock;
-unsigned int block_size;
+unsigned int block_size = 1024;
+
 
 /* returns the offset for a block number */
 unsigned long block_offset(unsigned int block) {
 	return SUPER_OFFSET + (block - 1) * block_size;
-}
-
-/* function to read in the superblock & print its csv summary*/
-void read_superblock() {
-	pread(disk_fd, &superblock, sizeof(superblock), SUPER_OFFSET);
-
-	fprintf(stdout, "SUPERBLOCK,%d,%d,%d,%d,%d,%d,%d\n", 
-		superblock.s_blocks_count, //total number of blocks
-		superblock.s_inodes_count, //total number of inodes
-		block_size,	//block size
-		superblock.s_inode_size, //i-node size
-		superblock.s_blocks_per_group, //blocks per group
-		superblock.s_inodes_per_group,//inodes per group
-		superblock.s_first_ino //first non-reserved inode 
-	);
-}
-
-/* for each free block, print the number of the free block */
-void free_blocks(int group, unsigned int block) {
-	//1 means 'used', 0 means 'free'
-	char* bytes = (char*) malloc(block_size);
-	unsigned long offset = block_offset(block);
-	unsigned int curr = superblock.s_first_data_block + group * superblock.s_blocks_per_group;
-	pread(disk_fd, bytes, block_size, offset);
-
-	unsigned int i, j;
-	for (i = 0; i < block_size; i++) {
-		char x = bytes[i];
-		for (j = 0; j < 8; j++) {
-			int used = 1 & x;
-			if (!used) {
-				fprintf(stdout, "BFREE,%d\n", curr);
-			}
-			x >>= 1;
-			curr++;
-		}
-	}
-	free(bytes);
 }
 
 /* store the time in the format mm/dd/yy hh:mm:ss, GMT
@@ -291,75 +254,72 @@ void read_inode(unsigned int inode_table_id, unsigned int index, unsigned int in
 	}
 }
 
-/* for each inode, print if free; if not, print inode summary */
-void read_inode_bitmap(int group, int block, int inode_table_id) {
+
+void superblock_summary() {
+	pread(disk_fd, &superblock, sizeof(superblock), SUPER_OFFSET);
+	block_size = EXT2_MIN_BLOCK_SIZE << superblock.s_log_block_size;
+	fprintf(stdout, "SUPERBLOCK,%d,%d,%d,%d,%d,%d,%d\n", superblock.s_blocks_count, superblock.s_inodes_count, block_size, superblock.s_inode_size, superblock.s_blocks_per_group, superblock.s_inodes_per_group, superblock.s_first_ino);
+
+}
+
+void free_block_enties(int group_num, uint32_t block_bitmap){
+	char* block = (char*) malloc(block_size);
+	unsigned int num_free_block = superblock.s_first_data_block + group_num * superblock.s_blocks_per_group;
+	pread(disk_fd, block, block_size, SUPER_OFFSET + (block_bitmap - 1) * block_size);
+
+	unsigned int i, j;
+	for (i = 0; i < block_size; i++) {
+		char data = block[i];
+		for (j = 0; j < 8; j++) {
+			// if not used
+			if (!(1 & data)) {
+				fprintf(stdout, "BFREE,%d\n", num_free_block);
+			}
+			data = data >> 1;
+			num_free_block++;
+		}
+	}
+	free(block);
+}
+
+void free_inode_entries(int group_num, uint32_t inode_bitmap, uint32_t inode_table){
 	int num_bytes = superblock.s_inodes_per_group / 8;
 	char* bytes = (char*) malloc(num_bytes);
 
-	unsigned long offset = block_offset(block);
-	unsigned int curr = group * superblock.s_inodes_per_group + 1;
-    	unsigned int start = curr;
-    	pread(disk_fd, bytes, num_bytes, offset);
+	unsigned long offset = SUPER_OFFSET + (inode_bitmap - 1) * block_size;
+	unsigned int num_free_inode = group_num * superblock.s_inodes_per_group + 1;
+	unsigned int start = num_free_inode;
+	pread(disk_fd, bytes, num_bytes, offset);
 
-    	int i, j;
-    	for (i = 0; i < num_bytes; i++) {
-    		char x = bytes[i];
-    		for (j = 0; j < 8; j++) {
-    			int used = 1 & x;
-    			if (used) { //inode is allocated
-    				read_inode(inode_table_id, curr - start, curr);
-    			} else { //free inode
-    				fprintf(stdout, "IFREE,%d\n", curr);
-    			}
-    			x >>= 1;
-    			curr++;
-    		}
-    	}
-    	free(bytes);
+	int i, j;
+	for (i = 0; i < num_bytes; i++) {
+		char data = bytes[i];
+		for (j = 0; j < 8; j++) {
+			int used = 1 & data;
+			if (used) { //inode is allocated
+				read_inode(inode_table, num_free_inode - start, num_free_inode);
+			} else { //free inode
+				fprintf(stdout, "IFREE,%d\n", num_free_inode);
+			}
+			data = data >> 1;
+			num_free_inode++;
+		}
+	}
+	free(bytes);
 }
 
-/* for each group, read bitmaps for blocks and inodes */
-void read_group(int group, int total_groups) {
+void group_summary(int group_num, int num_group) {
 	struct ext2_group_desc group_desc;
-	uint32_t descblock = 0;
-	if (block_size == 1024) {
-		descblock = 2;
-	} else {
-		descblock = 1;
-	}
+	pread(disk_fd, &group_desc, sizeof(struct ext2_group_desc), SUPER_OFFSET + sizeof(struct ext2_super_block));
 
-	unsigned long offset = block_size * descblock + 32 * group;
-	pread(disk_fd, &group_desc, sizeof(group_desc), offset);
+	int num_block = (group_num == num_group - 1 ? superblock.s_blocks_count - (superblock.s_blocks_per_group * (num_group - 1)) : superblock.s_blocks_per_group);
+	int num_inode = (group_num == num_group - 1 ? superblock.s_inodes_count - (superblock.s_inodes_per_group * (num_group - 1)) : superblock.s_inodes_per_group);
 
-	unsigned int num_blocks_in_group = superblock.s_blocks_per_group;
-	if (group == total_groups - 1) {
-		num_blocks_in_group = superblock.s_blocks_count - (superblock.s_blocks_per_group * (total_groups - 1));
-	}
+	fprintf(stdout, "GROUP,%d,%d,%d,%d,%d,%d,%d,%d\n", group_num, num_block, num_inode, group_desc.bg_free_blocks_count, group_desc.bg_free_inodes_count, group_desc.bg_block_bitmap, group_desc.bg_inode_bitmap, group_desc.bg_inode_table);
 
-	unsigned int num_inodes_in_group = superblock.s_inodes_per_group;
-	if (group == total_groups - 1) {
-		num_inodes_in_group = superblock.s_inodes_count - (superblock.s_inodes_per_group * (total_groups - 1));
-	}
-
-	fprintf(stdout, "GROUP,%d,%d,%d,%d,%d,%d,%d,%d\n",
-		group, //group number
-		num_blocks_in_group, //total number of blocks in this group
-		num_inodes_in_group, //total number of inodes
-		group_desc.bg_free_blocks_count, //number of free blocks 
-		group_desc.bg_free_inodes_count, //number of free inodes
-		group_desc.bg_block_bitmap, //block number of free block bitmap for this group
-		group_desc.bg_inode_bitmap, //block number of free inode bitmap for this group
-		group_desc.bg_inode_table //block number of first block of i-nodes in this group
-	);
-
-	unsigned int block_bitmap = group_desc.bg_block_bitmap;
-	free_blocks(group, block_bitmap);
-
-	unsigned int inode_bitmap = group_desc.bg_inode_bitmap;
-	unsigned int inode_table = group_desc.bg_inode_table;
-	read_inode_bitmap(group, inode_bitmap, inode_table);
+	free_block_enties(group_num, group_desc.bg_block_bitmap);
+	free_inode_entries(group_num, group_desc.bg_inode_bitmap, group_desc.bg_inode_table);
 }
-
 
 int main(int argc, char const *argv[])
 {
@@ -372,16 +332,14 @@ int main(int argc, char const *argv[])
 		fprintf(stderr, "%s\n", "Could not mount" );
 		exit(2);
 	}
-	block_size = EXT2_MIN_BLOCK_SIZE << superblock.s_log_block_size;
-	read_superblock();
-	int num_groups = superblock.s_blocks_count / superblock.s_blocks_per_group;
+	superblock_summary();
+	int num_group = superblock.s_blocks_count / superblock.s_blocks_per_group;
 	if ((double) num_groups < (double) superblock.s_blocks_count / superblock.s_blocks_per_group) {
 		num_groups++;
 	}
-	//fprintf(stderr, "%d", num_groups);
-	int i; 
-	for (i = 0; i < num_groups; i++) {
-		read_group(i, num_groups);
+	int i;
+	for (i = 0; i < num_group; i++){
+		group_summary(i, num_group);
 	}
 
 	return 0;

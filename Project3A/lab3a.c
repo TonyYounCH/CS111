@@ -40,15 +40,35 @@ char* get_time(time_t time) {
 	return time_format;
 }
 
+
+void printDirectoryEntries(uint32_t starting, uint32_t parentNum)
+{
+	struct ext2_dir_entry dir;
+    uint32_t current = starting;
+    while(current < starting + block_size)
+    {
+        pread(disk_fd, &dir, sizeof(struct ext2_dir_entry), current);
+        uint32_t parent = parentNum, logical = current - starting, inodeNumber = dir.inode, entryLength = dir.rec_len, nameLength = dir.name_len;
+        current += entryLength;
+        if(inodeNumber == 0)
+            continue;
+        fprintf(stdout, "DIRENT,%u,%u,%u,%u,%u,'", parent, logical, inodeNumber, entryLength, nameLength);
+        for(uint32_t i = 0; i < nameLength; i++)
+            fprintf(stdout, "%c", dir.name[i]);
+        fprintf(stdout, "'\n");
+    }
+
+}
+
 /* given location of directory entry block, produce directory entry summary */
 void directory_entries(unsigned int parent_inode, unsigned int block_num) {
 	struct ext2_dir_entry dir_entry;
-	unsigned long offset = block_offset(block_num);
-	unsigned int num_bytes = 0;
+	uint32_t offset = SUPER_OFFSET + (block_num - 1) * block_size;
+	uint32_t num_bytes = 0;
 
 	while(num_bytes < block_size) {
 		memset(dir_entry.name, 0, 256);
-		pread(disk_fd, &dir_entry, sizeof(dir_entry), offset + num_bytes);
+		pread(disk_fd, &dir_entry, sizeof(struct ext2_dir_entry), offset + num_bytes);
 		if (dir_entry.inode != 0) { //entry is not empty
 			memset(&dir_entry.name[dir_entry.name_len], 0, 256 - dir_entry.name_len);
 			fprintf(stdout, "DIRENT,%d,%d,%d,%d,%d,'%s'\n",
@@ -273,12 +293,20 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 	}
 	fprintf(stdout, "\n");
 
+	// //if the file_type is a directory, need to create a directory entry
+	// for (i = 0; i < 12; i++) {
+	// 	if (inode.i_block[i] != 0 && file_type == 'd') {
+	// 		directory_entries(num_free_inode, inode.i_block[i]);
+	// 	}
+	// }
+
 	//if the file_type is a directory, need to create a directory entry
 	for (i = 0; i < 12; i++) {
 		if (inode.i_block[i] != 0 && file_type == 'd') {
-			directory_entries(num_free_inode, inode.i_block[i]);
+			printDirectoryEntries(block_size * inode.i_block[i], num_free_inode);
 		}
 	}
+
 
 	single_indirect_block(inode, num_free_inode, file_type);
 	double_indirect_block(inode, num_free_inode, file_type);

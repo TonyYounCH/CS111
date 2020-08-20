@@ -8,7 +8,7 @@ The main purpose of this project is to understand the data format of the EXT2 fi
 #    lab3a.c     #
 ##################
 
-This code mainly implements:
+This code mainly contains:
 
 superblock summary
 group summary

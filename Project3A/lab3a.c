@@ -212,9 +212,13 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 	fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d", num_free_inode, file_type, imode, uid, gid, link_count, ctime, mtime, atime, file_size, num_blocks);
 
 	uint32_t i;
-	for (i = 0; i < 15; i++) {
-		// block address
-		fprintf(stdout, ",%d", inode.i_block[i]);
+	// block address
+	if(file_type == 's' || file_size <= 60)
+		fprintf(stdout, ",%d", inode.i_block[0]);
+	else {
+		for (i = 0; i < 15; i++) {
+			fprintf(stdout, ",%d", inode.i_block[i]);
+		}
 	}
 	fprintf(stdout, "\n");
 

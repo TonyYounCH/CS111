@@ -213,7 +213,7 @@ void inode_summary(uint32_t inode_table, int index, uint32_t num_free_inode) {
 
 	uint32_t i;
 	// block address
-	if(file_type == 's' || file_size <= 60)
+	if(file_type == 's' && file_size <= 60)
 		fprintf(stdout, ",%d", inode.i_block[0]);
 	else {
 		for (i = 0; i < 15; i++) {

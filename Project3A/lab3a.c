@@ -6,11 +6,10 @@ ID: 304207830
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h>
-#include <limits.h>
+#include <sys/types.h>
 #include <stdint.h>
 #include <time.h>
 #include <getopt.h>

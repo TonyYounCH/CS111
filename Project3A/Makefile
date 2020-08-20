@@ -9,4 +9,4 @@ dist: default
 	tar -czvf lab3a-304207830.tar.gz lab3a.c Makefile README ext2_fs.h
 
 clean:
-	rm -f *.o lab3a *.txt *.tar.gz *.csv trivial.img
+	rm -f *.o lab3a *.txt *.tar.gz

@@ -1,6 +1,6 @@
-#NAME: Luca Matsumoto
-#ID: 204726167
-#EMAIL: lucamatsumoto@gmail.com
+# NAME: Changhui Youn
+# EMAIL: tonyyoun2@gmail.com
+# ID: 304207830
 
 UNAME := $(shell uname -a)
 ifeq ($(findstring beaglebone,$(UNAME)),beaglebone)

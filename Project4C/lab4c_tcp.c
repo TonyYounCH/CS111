@@ -41,278 +41,278 @@ void mraa_deinit() {
 #include <mraa/aio.h>
 #endif
 
-#include <unistd.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <getopt.h>
 #include <string.h>
-#include <math.h>
-#include <poll.h>
-#include <signal.h>
-#include <sys/errno.h>
-#include <sys/types.h>
-#include <time.h>
 #include <sys/time.h>
-#include <ctype.h>
+#include <time.h>
+#include <math.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <ctype.h>
 
-#define PERIOD 'p'
-#define SCALE 's'
-#define LOG 'l'
-#define ID 'i'
-#define HOST 'h'
+#define A0 1
+#define TO_SERVER 1
 
-int period = 1;
+/* GLOBALS */
+struct tm *curr_time;
+struct timeval my_clock;
+time_t next_time = 0;
+mraa_aio_context temp; 
+
+//for options
 char scale = 'F';
-int stop = 0;
-time_t begin = 0;
-time_t end = 0;
-int log_flag = 0;
-int log_fd = -1;
-int port;
+int period = 1;
+FILE *file = 0;
+int report = 1;
+int port = -1;
+char* id = "";
 
-mraa_aio_context temp;
-
+//host and socket structures
 struct hostent *server;
-char* hostname = "";
-char* id;
+char* host = "";
 struct sockaddr_in server_address;
-int sock_fd = 0;
+int sock;
 
 
-// This shuts down and prints SHUTDOWN message to output
-void do_when_interrupted() {
-	struct timespec ts;
-	struct tm * tm;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	tm = localtime(&(ts.tv_sec));
-	dprintf(sock_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	if(log_flag) {
-		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
+/* gets temperature */
+double get_temp() {
+	int temperature = mraa_aio_read(temp);
+	int therm = 4275;
+	float nom = 100000.0;
+	float R = 1023.0/((float) temperature) - 1.0;
+	R *= nom;
+	float ret = 1.0/(log(R/nom)/therm + 1/298.15) - 273.15; 
+	if (scale == 'F') { //convert temperature to F
+		ret = (ret * 9)/5 + 32; 
 	}
-	exit(0);
+	return ret; 
 }
 
-// This prints out executing time and read temperature 
-void curr_temp_report(float temperature){
-	struct timespec ts;
-	struct tm * tm;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	tm = localtime(&(ts.tv_sec));
-	dprintf(sock_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-	if(log_flag && !stop) {
-		dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
+/* prints to stdout and file */
+void print(char *str, int to_server) {
+	if (to_server) {
+		dprintf(sock, "%s\n", out);
 	}
+	fprintf(stderr, "%s\n", out);
+	fprintf(file, "%s\n", out);
+	fflush(file);
 }
 
-// Initializes the sensors
-void initialize_the_sensors() {
-	temp = mraa_aio_init(1);
-	if (temp == NULL) {
-		fprintf(stderr, "Failed to init aio\n");
-		exit(1);
-	}
+/* shuts down, prints shut down time */
+void shutdown_and_exit(){
+	curr_time = localtime(&my_clock.tv_sec);
+	char out[200];
+	sprintf(out, "%02d:%02d:%02d SHUTDOWN", curr_time->tm_hour, 
+    		curr_time->tm_min, curr_time->tm_sec);
+    	print(out, TO_SERVER);
+   	exit(0);
 }
 
-// convert whatever output from the seonsor to desired scale
-float convert_temper_reading(int reading) {
-	float R = 1023.0/((float) reading) - 1.0;
-	float R0 = 100000.0;
-	float B = 4275;
-	R = R0*R;
-	//C is the temperature in Celcious
-	float C = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
-	//F is the temperature in Fahrenheit
-	float F = (C * 9)/5 + 32;
-	if(scale == 'C')
-		return C;
-	else
-		return F;
-}
-
-void report_temp() {
-	// if it is time to report temperature && !stop
-	// read from temperature sensor, convert and report
-	time(&end);
-	if(difftime(end, begin) >= period && !stop) {
-		time(&begin);
-		int reading = mraa_aio_read(temp);
-		float temperature = convert_temper_reading(reading);
-		curr_temp_report(temperature);
+/* prints out the time stamp and temperature */
+void time_stamp() {
+	gettimeofday(&my_clock, 0);
+	if (report && my_clock.tv_sec >= next_time) {
+		double temp = get_temp();
+		int t = temp * 10;
+		curr_time = localtime(&my_clock.tv_sec);
+		char out[200];
+		sprintf(out, "%02d:%02d:%02d %d.%1d", curr_time->tm_hour, 
+				curr_time->tm_min, curr_time->tm_sec, t/10, t%10);
+		print(out, TO_SERVER);
+		next_time = my_clock.tv_sec + period; 
 	}
 }
 
-// This function processes stdin
-void process_stdin(char *input) {
-	if(strcmp(input, "SCALE=F") == 0){
-		scale = 'F';
-		if(log_flag)
-			dprintf(log_fd, "SCALE=F\n");
-	} else if(strcmp(input, "SCALE=C") == 0){
-		scale = 'C';
-		if(log_flag)
-			dprintf(log_fd, "SCALE=C\n");
-	} else if(strncmp(input, "PERIOD=", sizeof(char)*7) == 0){
-		period = (int)atoi(input+7);
-		if(log_flag)
-			dprintf(log_fd, "PERIOD=%d\n", period);
-	} else if(strcmp(input, "STOP") == 0){
-		stop = 1;
-		if(log_flag)
-			dprintf(log_fd, "STOP\n");
-	} else if(strcmp(input, "START") == 0){
-		stop = 0;
-		if(log_flag)
-			dprintf(log_fd, "START\n");
-	} else if((strncmp(input, "LOG", sizeof(char)*3) == 0)){
-		if(log_flag){
-			dprintf(log_fd, "%s\n", input);
+/* parse input from stdin */
+void process_input(char *input) {
+	while(*input == ' ' || *input == '\t') {
+		input++;
+	}
+	char *in_per = strstr(input, "PERIOD=");
+	char *in_log = strstr(input, "LOG");
+
+	if(strcmp(input, "SCALE=F") == 0) {
+		print(input, 0);
+		scale = 'F'; 
+	} else if(strcmp(input, "SCALE=C") == 0) {
+		print(input, 0);
+		scale = 'C'; 
+	} else if(strcmp(input, "STOP") == 0) {
+		print(input, 0);
+		report = 0;
+	} else if(strcmp(input, "START") == 0) {
+		print(input, 0);
+		report = 1;
+	} else if(strcmp(input, "OFF") == 0) {
+		print(input, 0);
+		shutdown_and_exit();
+	} else if(in_per == input) {
+		char *n = input;
+		n += 7; 
+		if(*n != 0) {
+			int p = atoi(n);
+			while(*n != 0) {
+				if (!isdigit(*n)) {
+					return;
+				}
+				n++;
+			}
+			period = p;
 		}
-	} else if(strcmp(input, "OFF") == 0){
-		if(log_flag)
-			dprintf(log_fd, "OFF\n");
-		do_when_interrupted();
-	} else {
-		fprintf(stderr, "Command cannot be recognized\n");
-		exit(1);
+		print(input, 0);
+	} else if (in_log == input) {
+		print(input, 0); 
 	}
 }
 
-
-void setup_tcp() {
-	sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sock_fd < 0){
-		fprintf(stderr, "Failed to create socket in client\n");
+/* reads input from the server */
+void server_input(char* input) {
+	int ret = read(sock, input, 256);
+	//fprintf(stderr, "Ret is %d\n", ret);
+	if (ret > 0) {
+		input[ret] = 0;
+		//fprintf(stderr, "Received %d bytes %s\n", ret, input);
 	}
-	if ((server = gethostbyname(hostname)) == NULL){
-		fprintf(stderr, "No host\n");
-	}
-	memset((void*)&server_address, 0, sizeof(server_address));
-	server_address.sin_family = AF_INET;
-	memcpy((char *) &server_address.sin_addr.s_addr, (char *) server->h_addr, server->h_length);
-	server_address.sin_port = htons(port);
-	if(connect(sock_fd, (struct sockaddr*) &server_address, sizeof(server_address))< 0){
-		fprintf(stderr, "Failed to connect to socket\n");
-		exit(1);
+	char *s = input;
+	while (s < &input[ret]) {
+		char* e = s;
+		while (e < &input[ret] && *e != '\n') {
+			e++;
+		}
+		*e = 0;
+		//fprintf(stderr, "processing %s\n", s);
+		process_input(s);
+		s = &e[1];
 	}
 }
+
 
 int main(int argc, char* argv[]) {
-	int opt = 0;
+
 	struct option options[] = {
-		{"period", 1, NULL, PERIOD},
-		{"scale", 1, NULL, SCALE},
-		{"log", 1, NULL, LOG},
-		{"id", 1, NULL, ID},
-		{"host", 1, NULL, HOST},
+		{"period", required_argument, NULL, 'p'},
+		{"log", required_argument, NULL, 'l'},
+		{"id", required_argument, NULL, 'i'},
+   		{"scale", required_argument, NULL, 's'},
+		{"host", required_argument, NULL, 'h'},
 		{0, 0, 0, 0}
 	};
 
+	int opt; //parse options
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
-			case PERIOD: 
-				// get checking period
+			case 'p': 
 				period = atoi(optarg);
 				break;
-			case SCALE:
-				// get iteration #
+			case 'l':
+				file = fopen(optarg, "w+");
+            	if (file == NULL) {
+	           		fprintf(stderr, "Logfile invalid\n");
+					exit(1);
+				}
+				break;
+			case 's':
 				if (optarg[0] == 'F' || optarg[0] == 'C') {
 					scale = optarg[0];
-				} else {
-					fprintf(stderr, "Invalid argument(s)\n--scale option only accepts [C, F]\n");
-					exit(1);
+					break;
 				}
-				break;
-			case LOG:
-				// log file
-				log_flag = 1;
-				char* filename = optarg;
-				if ((log_fd = creat(filename, 0666)) < 0) {
-					fprintf(stderr, "--log=filename failed to create/write to file\n");
-					exit(1);
-				}
-				break;
-			case ID:
+			case 'i':
 				id = optarg;
 				break;
-			case HOST:
-				hostname = optarg;
+			case 'h':
+				host = optarg;
 				break;
 			default:
-				fprintf(stderr, "Invalid argument(s)\nYou may use --period=#, --scale=[C,F], --log=filepath, --host=hostname, --id=#\n");
+				fprintf(stderr, "Error in arguments.\n");
 				exit(1);
-				break;
+		}
+	}
+	if (optind < argc) {
+		port = atoi(argv[optind]);
+		if (port <= 0) {
+			fprintf(stderr, "Invalid port\n");
+			exit(1);
 		}
 	}
 
-	port = atoi(argv[optind]);
-	if (port <= 0) {
-		fprintf(stderr, "Invalid port number\n");
+	if (strlen(host) == 0) {
+		fprintf(stderr, "Host argument is mandatory\n");
 		exit(1);
 	}
-
-	if (strlen(hostname) == 0) {
-		fprintf(stderr, "--host is mandatory\n");
-		exit(1);
-	}
-	if (log_fd == -1) {
-		fprintf(stderr, "--log is mandatory\n");
+	if (file == 0) {
+		fprintf(stderr, "Log argument is mandatory\n");
 		exit(1);
 	}
 	if (strlen(id) != 9) {
-		fprintf(stderr, "ID must be 9 digit\n");
+		fprintf(stderr, "ID must be a 9 digit number\n");
 		exit(1);
 	} 
 
-	setup_tcp();
-	dprintf(sock_fd, "ID=%s\n", id);
-	dprintf(log_fd, "ID=%s\n", id);
-	initialize_the_sensors();
+	/* Open a TCP connection to the server at the specified address and port */
 
-	struct pollfd pollfd;
-	pollfd.fd = 0;
-	pollfd.events = POLLIN;
+	//create a socket and find host
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "Failure to create socket in client program.\n");
+		exit(1);
+	}
+	if ((server = gethostbyname(host)) == NULL) {
+		fprintf(stderr, "Could not find host\n");
+	}
+	memset( (void *) &server_address, 0, sizeof(server_address));
+	server_address.sin_family = AF_INET;
+	memcpy( (char *) &server_address.sin_addr.s_addr, 
+		    (char *) server->h_addr, 
+		    server->h_length);
+	server_address.sin_port = htons(port);
+	if (connect(sock, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) {
+      		fprintf(stderr, "Failure to connect on client side.\n");
+      		exit(1);
+  	}
 
-	char buffer[256];
-	char full_command[256];
-	memset(buffer, 0, 256);
-	memset(full_command, 0, 256);
-	int index = 0;
-	while (1) {
-		// if it is time to report temperature && !stop
-		// read from temperature sensor, convert and report
-		report_temp();
+	/* Immediately send (and log) an ID terminated with a newline. */
+	char out[50];
+	sprintf(out, "ID=%s", id);
+	print(out, TO_SERVER);
 
-		 // use poll syscalls, no or very short< 50ms timeout interval
-		if(poll(&pollfd, 1, 0) < 0){
-			fprintf(stderr, "Failed to read from poll\n");
+	/* 
+	 * Send (and log) temperature reports,
+	 * process (and log) commands received over connection.
+	 */
+
+	temp = mraa_aio_init(A0);
+
+	if (temp== NULL) {
+		fprintf(stderr, "Failed to initialize AIO\n");
+		mraa_deinit();
+		return EXIT_FAILURE;
+    	}
+
+	struct pollfd pollInput; 
+	pollInput.fd = sock; 
+	pollInput.events = POLLIN; 
+
+	char *input;
+	input = (char *)malloc(1024 * sizeof(char));
+	if(input == NULL) {
+		fprintf(stderr, "Could not allocate input buffer\n");
+		exit(1);
+	}
+
+	while(1) {
+		time_stamp();
+		int ret = poll(&pollInput, 1, 0);
+		if(ret) {
+			server_input(input);
 		}
-		if(pollfd.revents && POLLIN){
-			int res = read(sock_fd, buffer, 256);
-			if(res < 0){
-				fprintf(stderr, "Failed to read from STDIN_FILENO\n");
-			}
-			int i;
-			for(i = 0; i < res && index < 256; i++){
-				if(buffer[i] =='\n'){
-					process_stdin((char*)&full_command);
-					index = 0;
-					memset(full_command, 0, 256);
-				} else {
-					full_command[index] = buffer[i];
-					index++;
-				}
-			}
-			
-		} 
 	}
 
 	mraa_aio_close(temp);
-
-	return 0;
-
-
-
+	exit(0);
 }

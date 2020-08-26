@@ -244,21 +244,21 @@ void setupPollandTime(){
     polls[0].fd = sock_fd;
     polls[0].events = POLLIN | POLLERR | POLLHUP;
     for(;;){
-        int value = mraa_aio_read(sensor);
+        int value = mraa_aio_read(temp);
         double tempValue = convert_temper_reading(value);
-        if(!stopReports){
+        if(!stop){
             curr_temp_report(tempValue);
         }
         time_t begin, end;
         time(&begin);
         time(&end); //start begin and end at the same time and keep running loop until period is reached
         while(difftime(end, begin) < period){
-            int ret = poll(polls, 1, 0);
+            poll(polls, 1, 0);
             // if(ret < 0){
             //     print_errors("poll");
             // }
             if(polls[0].revents && POLLIN){
-                int num = SSL_read(ssl, commandBuff, 128);
+                SSL_read(ssl, commandBuff, 128);
                 // if(num < 0){
                 //     print_errors("read");
                 // }

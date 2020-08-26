@@ -101,6 +101,8 @@ void do_when_interrupted() {
 	if(log_flag) {
 		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
+	SSL_shutdown(ssl);
+	SSL_free(ssl);
 	exit(0);
 }
 
@@ -212,7 +214,6 @@ void setup_connection() {
 void setup_ssl() {
 	OpenSSL_add_all_algorithms();
 	SSL_library_init();
-    SSL_load_error_strings();
 	SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
 	if(ssl_ctx == NULL){
 		fprintf(stderr, "Failed to get ssl context\n");
@@ -230,6 +231,106 @@ void setup_ssl() {
 		fprintf(stderr, "Failed to establish ssl Connection\n");
 		exit(2);
 	}
+}
+
+void handle_scale(char scale) {
+    switch(scale){
+        case 'C':
+        case 'c':
+            flag = 'C';
+            if(log_flag && stop == 0){
+                dprintf(log_fd, "SCALE=C\n");
+            }
+            break;
+        case 'F':
+        case 'f':
+            flag = 'F';
+            if(log_flag && stop == 0){
+                dprintf(log_fd, "SCALE=F\n");
+            }
+            break;
+        default:
+            fprintf(stderr, "Incorrect scale option");
+            break;
+    }
+}
+
+void handle_shutdown() {
+    time_t raw;
+    struct tm* currTime;
+    time(&raw);
+    currTime = localtime(&raw);
+    char buff[256];
+    sprintf(buff, "%.2d:%.2d:%.2d SHUTDOWN\n", currTime->tm_hour, currTime->tm_min, currTime->tm_sec);
+    print_to_server(buff);
+    if(log_flag) {
+        dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", currTime->tm_hour, currTime->tm_min, currTime->tm_sec);
+    }
+    exit(0);
+}
+
+void handle_off() {
+    if(log_flag){
+        dprintf(log_fd, "OFF\n");
+    }
+    handle_shutdown();
+}
+
+void handle_period(int newPeriod) {
+    period = newPeriod;
+    if(log_flag && stop == 0){
+        dprintf(log_fd, "PERIOD=%d\n", period);
+    }
+}
+
+void handle_stop() {
+    stop = 1;
+    if(log_flag){
+        dprintf(log_fd, "STOP\n");
+    }
+}
+
+void handle_start() {
+    stop = 0;
+    if(log_flag){
+        dprintf(log_fd, "START\n");
+    }
+}
+
+void handle_log(const char* input) {
+    if(log_flag){
+        dprintf(log_fd, "%s\n", input);
+    }
+}
+
+
+void handle_input(const char* input) {
+    if(strcmp(input, "OFF") == 0){
+        handle_off();
+    }
+    else if(strcmp(input, "START") == 0){
+        handle_start();
+    }
+    else if(strcmp(input, "STOP") == 0){
+        handle_stop();
+    }
+    else if(strcmp(input, "SCALE=F") == 0){
+        handle_scale('F');
+    }
+    else if(strcmp(input, "SCALE=C") == 0){
+        handle_scale('C');
+    }
+    else if(strncmp(input, "PERIOD=", sizeof(char)*7) == 0){
+        int newPeriod = (int)atoi(input+7);
+        handle_period(newPeriod);
+    }
+    else if((strncmp(input, "LOG", sizeof(char)*3) == 0)){
+        handle_log(input);
+    }
+    else {
+        fprintf(stderr, "Command not recognized\n");
+        exit(1);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -335,7 +436,7 @@ int main(int argc, char* argv[]) {
 			int i;
 			for(i = 0; i < res && index < 256; i++){
 				if(buffer[i] =='\n'){
-					process_stdin((char*)&full_command);
+					handle_input((char*)&full_command);
 					index = 0;
 					memset(full_command, 0, 256);
 				} else {

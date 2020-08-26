@@ -271,7 +271,7 @@ int main(int argc, char* argv[]) {
 	initialize_the_sensors();
 
 	struct pollfd pollfd;
-	pollfd.fd = socket_fd;
+	pollfd.fd = sock_fd;
 	pollfd.events = POLLIN;
 
 	char buffer[256];

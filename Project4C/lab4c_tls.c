@@ -84,6 +84,11 @@ int sock_fd = 0;
 SSL* ssl;
 
 
+void print_to_server(char *str) {
+	if(SSL_write(ssl, str, strlen(str) + 1) < 0){
+		fprintf(stderr, "Failed to write to ssl\n");
+	}
+}
 // This shuts down and prints SHUTDOWN message to output
 void do_when_interrupted() {
 	char buf[256];
@@ -224,12 +229,6 @@ void setup_ssl() {
 	if(SSL_connect(ssl) != 1){
 		fprintf(stderr, "Failed to establish ssl Connection\n");
 		exit(2);
-	}
-}
-
-void print_to_server(char *str) {
-	if(SSL_write(ssl, str, strlen(str) + 1) < 0){
-		fprintf(stderr, "Failed to write to ssl\n");
 	}
 }
 

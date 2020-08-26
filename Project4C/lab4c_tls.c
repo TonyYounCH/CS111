@@ -414,7 +414,46 @@ int main(int argc, char** argv){
     setup_connection();
     send_id();
     initialize_the_sensors();
-    setupPollandTime();
+
+    struct pollfd pollfd;
+    pollfd.fd = sock_fd;
+    pollfd.events = POLLIN;
+
+    char buffer[256];
+    char full_command[256];
+    memset(buffer, 0, 256);
+    memset(full_command, 0, 256);
+    int index = 0;
+    while (1) {
+        // if it is time to report temperature && !stop
+        // read from temperature sensor, convert and report
+        report_temp();
+
+         // use poll syscalls, no or very short< 50ms timeout interval
+        if(poll(&pollfd, 1, 0) < 0){
+            fprintf(stderr, "Failed to read from poll\n");
+        }
+        if(pollfd.revents && POLLIN){
+            int res = SSL_read(ssl, buffer, 256);
+            if(res < 0){
+                fprintf(stderr, "Failed to read from STDIN_FILENO\n");
+            }
+            int i;
+            for(i = 0; i < res && index < 256; i++){
+                if(buffer[i] =='\n'){
+                    process_stdin((char*)&full_command);
+                    index = 0;
+                    memset(full_command, 0, 256);
+                } else {
+                    full_command[index] = buffer[i];
+                    index++;
+                }
+            }
+            
+        } 
+    }
+
+
     deinit_sensors();
     exit(0);
 }

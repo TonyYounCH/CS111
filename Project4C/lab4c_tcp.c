@@ -175,7 +175,7 @@ void process_stdin(char *input) {
 			dprintf(log_fd, "OFF\n");
 		do_when_interrupted();
 	} else {
-		fprintf(stdout, "Command cannot be recognized\n");
+		fprintf(stderr, "Command cannot be recognized\n");
 		exit(1);
 	}
 }
@@ -290,7 +290,7 @@ int main(int argc, char* argv[]) {
 			fprintf(stderr, "Failed to read from poll\n");
 		}
 		if(pollfd.revents && POLLIN){
-			int res = read(0, buffer, 256);
+			int res = read(sock_fd, buffer, 256);
 			if(res < 0){
 				fprintf(stderr, "Failed to read from STDIN_FILENO\n");
 			}

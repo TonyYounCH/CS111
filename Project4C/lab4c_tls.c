@@ -241,6 +241,7 @@ void setupPollandTime(){
     memset(commandBuff, 0, 128);
     memset(copyBuff, 0, 128);
     int copyIndex = 0;
+    struct pollfd polls[1];
     polls[0].fd = sock_fd;
     polls[0].events = POLLIN | POLLERR | POLLHUP;
     for(;;){

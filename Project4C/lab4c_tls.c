@@ -64,8 +64,9 @@ void mraa_deinit() {
 #define HOST 'h'
 
 //** REMEMBER TO CHANGE EXIT CODES
-const int B = 4275;               // B value of the thermistor
-const int R0 = 100000;            // R0 = 100k
+
+time_t begin = 0;
+time_t end = 0;
 int period = 1;
 char flag = 'F';
 struct pollfd polls[1];
@@ -159,10 +160,26 @@ void curr_temp_report(float temperature){
     clock_gettime(CLOCK_REALTIME, &ts);
     tm = localtime(&(ts.tv_sec));
     sprintf(buf, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-    print_to_server(buf);
+    write_message(buf);
     if(log_flag && !stop) {
         dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
     }
+}
+
+// convert whatever output from the seonsor to desired scale
+float convert_temper_reading(int reading) {
+    float R = 1023.0/((float) reading) - 1.0;
+    float R0 = 100000.0;
+    float B = 4275;
+    R = R0*R;
+    //C is the temperature in Celcious
+    float C = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
+    //F is the temperature in Fahrenheit
+    float F = (C * 9)/5 + 32;
+    if(flag == 'C')
+        return C;
+    else
+        return F;
 }
 
 void report_temp() {
@@ -185,22 +202,6 @@ void initialize_the_sensors() {
 		fprintf(stderr, "Failed to init aio\n");
 		exit(1);
 	}
-}
-
-// convert whatever output from the seonsor to desired scale
-float convert_temper_reading(int reading) {
-	float R = 1023.0/((float) reading) - 1.0;
-	float R0 = 100000.0;
-	float B = 4275;
-	R = R0*R;
-	//C is the temperature in Celcious
-	float C = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
-	//F is the temperature in Fahrenheit
-	float F = (C * 9)/5 + 32;
-	if(flag == 'C')
-		return C;
-	else
-		return F;
 }
 
 void do_when_interrupted() {
@@ -279,51 +280,51 @@ void setup_connection() {
 	}
 }
 
-void setupPollandTime(){
-    char commandBuff[128];
-    char copyBuff[128];
-    memset(commandBuff, 0, 128);
-    memset(copyBuff, 0, 128);
-    int copyIndex = 0;
-    polls[0].fd = sock_fd;
-    polls[0].events = POLLIN | POLLERR | POLLHUP;
-    for(;;){
-        int value = mraa_aio_read(temp);
-        float tempValue = convert_temper_reading(value);
-        if(!stop){
-            create_report(tempValue);
-        }
-        time_t begin, end;
-        time(&begin);
-        time(&end); //start begin and end at the same time and keep running loop until period is reached
-        while(difftime(end, begin) < period){
-            int ret = poll(polls, 1, 0);
-            if(ret < 0){
-                print_errors("poll");
-            }
-            if(polls[0].revents && POLLIN){
-                int num = SSL_read(ssl, commandBuff, 128);
-                if(num < 0){
-                    print_errors("read");
-                }
-                int i;
-                for(i = 0; i < num && copyIndex < 128; i++){
-                    if(commandBuff[i] =='\n'){
-                        process_stdin((char*)&copyBuff);
-                        copyIndex = 0;
-                        memset(copyBuff, 0, 128); //clear
-                    }
-                    else {
-                        copyBuff[copyIndex] = commandBuff[i];
-                        copyIndex++;
-                    }
-                }
+// void setupPollandTime(){
+//     char commandBuff[128];
+//     char copyBuff[128];
+//     memset(commandBuff, 0, 128);
+//     memset(copyBuff, 0, 128);
+//     int copyIndex = 0;
+//     polls[0].fd = sock_fd;
+//     polls[0].events = POLLIN | POLLERR | POLLHUP;
+//     for(;;){
+//         int value = mraa_aio_read(temp);
+//         float tempValue = convert_temper_reading(value);
+//         if(!stop){
+//             create_report(tempValue);
+//         }
+//         time_t begin, end;
+//         time(&begin);
+//         time(&end); //start begin and end at the same time and keep running loop until period is reached
+//         while(difftime(end, begin) < period){
+//             int ret = poll(polls, 1, 0);
+//             if(ret < 0){
+//                 print_errors("poll");
+//             }
+//             if(polls[0].revents && POLLIN){
+//                 int num = SSL_read(ssl, commandBuff, 128);
+//                 if(num < 0){
+//                     print_errors("read");
+//                 }
+//                 int i;
+//                 for(i = 0; i < num && copyIndex < 128; i++){
+//                     if(commandBuff[i] =='\n'){
+//                         process_stdin((char*)&copyBuff);
+//                         copyIndex = 0;
+//                         memset(copyBuff, 0, 128); //clear
+//                     }
+//                     else {
+//                         copyBuff[copyIndex] = commandBuff[i];
+//                         copyIndex++;
+//                     }
+//                 }
                 
-            }
-            time(&end);
-        }
-    }
-}//help with time https://www.tutorialspoint.com/c_standard_library/c_function_time.htm
+//             }
+//             time(&end);
+//         }
+//     }
+// }//help with time https://www.tutorialspoint.com/c_standard_library/c_function_time.htm
 
 void setup_ssl() {
 	OpenSSL_add_all_algorithms();

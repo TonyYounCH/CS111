@@ -456,7 +456,7 @@ void setupConnection() {
     memset((char*)&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     bcopy((char*)server->h_addr, (char*)&server_address.sin_addr.s_addr, server->h_length);
-    server_address.sin_port = htons(portNum);
+    server_address.sin_port = htons(port);
     if(connect(sock_fd, (struct sockaddr*)&server_address, sizeof(server_address))< 0){
         print_errors("connection");
     }

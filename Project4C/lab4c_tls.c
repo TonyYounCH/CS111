@@ -191,13 +191,6 @@ void process_stdin(char *input) {
     }
 }
 
-
-void deinit_sensors(){
-    mraa_aio_close(temp);
-    close(log_fd);
-}
-
-
 void setup_connection() {
 	if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
 		fprintf(stderr, "Failed to create socket in client\n");
@@ -357,7 +350,8 @@ int main(int argc, char** argv){
     }
 
 
-    deinit_sensors();
+    mraa_aio_close(temp);
+    close(log_fd);
     exit(0);
 }
 //button is no longer used as a method of shutdown

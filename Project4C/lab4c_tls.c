@@ -65,29 +65,23 @@ void mraa_deinit() {
 
 //** REMEMBER TO CHANGE EXIT CODES
 
-int period = 1;
-char flag = 'F';
-int stop = 0;
 time_t begin = 0;
 time_t end = 0;
-int log_flag = 0;
+int period = 1;
+char flag = 'F';
+struct pollfd polls[1];
 int log_fd;
+int log_flag = 0;
+int stop = 0;
 int port;
-
-mraa_aio_context temp;
-
-struct hostent *server;
-char* hostname = "";
-char* id;
-struct sockaddr_in server_address;
 int sock_fd = 0;
+struct sockaddr_in server_address;
+struct hostent *server;
+char* hostname = NULL;
+char* id;
+mraa_aio_context temp;
 SSL* ssl;
 
-void print_to_server(char *str) {
-    if(SSL_write(ssl, str, strlen(str) + 1) < 0){
-        fprintf(stderr, "Failed to write to ssl\n");
-    }
-}
 void print_errors(char* error){
     if(strcmp(error, "temp") == 0){
         fprintf(stderr, "Failed to initialize temperature sensor\n");
@@ -152,6 +146,11 @@ void print_errors(char* error){
     }
 }
 
+void write_message(char* message) {
+    if(SSL_write(ssl, message, strlen(message))< 0){
+        print_errors("ssl write");
+    }
+}
 
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
@@ -161,7 +160,7 @@ void curr_temp_report(float temperature){
     clock_gettime(CLOCK_REALTIME, &ts);
     tm = localtime(&(ts.tv_sec));
     sprintf(buf, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-    print_to_server(buf);
+    write_message(buf);
     if(log_flag && !stop) {
         dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
     }
@@ -212,7 +211,7 @@ void do_when_interrupted() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	tm = localtime(&(ts.tv_sec));
 	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	print_to_server(buf);
+	write_message(buf);
 	if(log_flag) {
 		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
@@ -257,6 +256,13 @@ void process_stdin(char *input) {
     }
 }
 
+
+void deinit_sensors(){
+    mraa_aio_close(temp);
+    close(log_fd);
+}
+
+
 void setup_connection() {
 	if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
 		fprintf(stderr, "Failed to create socket in client\n");
@@ -273,6 +279,7 @@ void setup_connection() {
 		exit(1);
 	}
 }
+
 void setup_ssl() {
 	OpenSSL_add_all_algorithms();
 	SSL_library_init();
@@ -299,7 +306,7 @@ void send_id() {
     char buffer[64];
     setup_ssl();
     sprintf(buffer, "ID=%s\n", id);
-    print_to_server(buffer);
+    write_message(buffer);
     dprintf(log_fd, "ID=%s\n", id);
 }
 
@@ -415,8 +422,7 @@ int main(int argc, char** argv){
     }
 
 
-    mraa_aio_close(temp);
-    close(log_fd);
+    deinit_sensors();
     exit(0);
 }
 //button is no longer used as a method of shutdown

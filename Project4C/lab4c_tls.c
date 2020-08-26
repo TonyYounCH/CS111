@@ -86,6 +86,7 @@ void print_to_server(char *str) {
 		fprintf(stderr, "Failed to write to ssl\n");
 	}
 }
+
 // This shuts down and prints SHUTDOWN message to output
 void do_when_interrupted() {
 	char buf[256];
@@ -102,6 +103,7 @@ void do_when_interrupted() {
 	SSL_free(ssl);
 	exit(0);
 }
+
 
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
@@ -230,17 +232,26 @@ void setup_ssl() {
 	}
 }
 
-int main(int argc, char* argv[]) {
+void send_id() {
+	char buffer[64];
+	setup_ssl();
+	sprintf(buffer, "ID=%s\n", id);
+	print_to_server(buffer);
+	dprintf(log_fd, "ID=%s\n", id);
+}
+
+
+int main(int argc, char** argv){
 	int opt = 0;
-	struct option options[] = {
-		{"period", 1, NULL, PERIOD},
-		{"scale", 1, NULL, SCALE},
-		{"log", 1, NULL, LOG},
-		{"id", 1, NULL, ID},
-		{"host", 1, NULL, HOST},
+	static struct option options [] = {
+		{"period", 1, 0, 'p'},
+		{"scale", 1, 0, 's'},
+		{"log", 1, 0, 'l'},
+		{"id", 1, 0, 'i'},
+		{"host", 1, 0, 'h'},
 		{0, 0, 0, 0}
 	};
-
+	
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
 			case PERIOD: 
@@ -297,14 +308,9 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	} 
 
+	// close(STDIN_FILENO); //close input
 	setup_connection();
-	setup_ssl();
-
-	char buf[32];
-	sprintf(buf, "ID=%s", id);
-	print_to_server(buf);
-	dprintf(log_fd, "ID=%s\n", id);
-
+	send_id();
 	initialize_the_sensors();
 
 	struct pollfd pollfd;
@@ -345,11 +351,12 @@ int main(int argc, char* argv[]) {
 		} 
 	}
 
+
 	mraa_aio_close(temp);
 	close(log_fd);
-
-	return 0;
-
-
-
+	exit(0);
 }
+//button is no longer used as a method of shutdown
+
+//IF IT DOENS'T WORK USE THE STRING THING FOR SSL
+

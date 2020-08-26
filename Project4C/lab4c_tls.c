@@ -87,6 +87,7 @@ void print_to_server(char *str) {
     }
 }
 
+// This shuts down and prints SHUTDOWN message to output
 void do_when_interrupted() {
     char buf[256];
     struct timespec ts;
@@ -103,6 +104,7 @@ void do_when_interrupted() {
     exit(0);
 }
 
+
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
     char buf[256];
@@ -117,6 +119,15 @@ void curr_temp_report(float temperature){
     }
 }
 
+// Initializes the sensors
+void initialize_the_sensors() {
+    temp = mraa_aio_init(1);
+    if (temp == NULL) {
+        fprintf(stderr, "Failed to init aio\n");
+        exit(1);
+    }
+}
+
 // convert whatever output from the seonsor to desired scale
 float convert_temper_reading(int reading) {
     float R = 1023.0/((float) reading) - 1.0;
@@ -127,7 +138,7 @@ float convert_temper_reading(int reading) {
     float C = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
     //F is the temperature in Fahrenheit
     float F = (C * 9)/5 + 32;
-    if(flag == 'C')
+    if(scale == 'C')
         return C;
     else
         return F;
@@ -145,24 +156,14 @@ void report_temp() {
     }
 }
 
-
-// Initializes the sensors
-void initialize_the_sensors() {
-	temp = mraa_aio_init(1);
-	if (temp == NULL) {
-		fprintf(stderr, "Failed to init aio\n");
-		exit(1);
-	}
-}
-
 // This function processes stdin
 void process_stdin(char *input) {
     if(strcmp(input, "SCALE=F") == 0){
-        flag = 'F';
+        scale = 'F';
         if(log_flag)
             dprintf(log_fd, "SCALE=F\n");
     } else if(strcmp(input, "SCALE=C") == 0){
-        flag = 'C';
+        scale = 'C';
         if(log_flag)
             dprintf(log_fd, "SCALE=C\n");
     } else if(strncmp(input, "PERIOD=", sizeof(char)*7) == 0){
@@ -191,43 +192,44 @@ void process_stdin(char *input) {
     }
 }
 
+
 void setup_connection() {
-	if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-		fprintf(stderr, "Failed to create socket in client\n");
-	}
-	if ((server = gethostbyname(hostname)) == NULL){
-		fprintf(stderr, "No host\n");
-	}
-	memset((void*)&server_address, 0, sizeof(server_address));
-	server_address.sin_family = AF_INET;
-	memcpy((char *) &server_address.sin_addr.s_addr, (char *) server->h_addr, server->h_length);
-	server_address.sin_port = htons(port);
-	if(connect(sock_fd, (struct sockaddr*) &server_address, sizeof(server_address))< 0){
-		fprintf(stderr, "Failed to connect to socket\n");
-		exit(1);
-	}
+    if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        fprintf(stderr, "Failed to create socket in client\n");
+    }
+    if ((server = gethostbyname(hostname)) == NULL){
+        fprintf(stderr, "No host\n");
+    }
+    memset((void*)&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    memcpy((char *) &server_address.sin_addr.s_addr, (char *) server->h_addr, server->h_length);
+    server_address.sin_port = htons(port);
+    if(connect(sock_fd, (struct sockaddr*) &server_address, sizeof(server_address))< 0){
+        fprintf(stderr, "Failed to connect to socket\n");
+        exit(1);
+    }
 }
 
 void setup_ssl() {
-	OpenSSL_add_all_algorithms();
-	SSL_library_init();
-	SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
-	if(ssl_ctx == NULL){
-		fprintf(stderr, "Failed to get ssl context\n");
-		exit(2);
-	}
-	if((ssl = SSL_new(ssl_ctx)) == NULL){
-		fprintf(stderr, "Failed to setup ssl\n");
-		exit(2);
-	}
-	if(SSL_set_fd(ssl, sock_fd)<0) {
-		fprintf(stderr, "Failed to associate sock_fd -> ssl\n");
-		exit(2);
-	}
-	if(SSL_connect(ssl) != 1){
-		fprintf(stderr, "Failed to establish ssl Connection\n");
-		exit(2);
-	}
+    OpenSSL_add_all_algorithms();
+    SSL_library_init();
+    SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
+    if(ssl_ctx == NULL){
+        fprintf(stderr, "Failed to get ssl context\n");
+        exit(2);
+    }
+    if((ssl = SSL_new(ssl_ctx)) == NULL){
+        fprintf(stderr, "Failed to setup ssl\n");
+        exit(2);
+    }
+    if(SSL_set_fd(ssl, sock_fd)<0) {
+        fprintf(stderr, "Failed to associate sock_fd -> ssl\n");
+        exit(2);
+    }
+    if(SSL_connect(ssl) != 1){
+        fprintf(stderr, "Failed to establish ssl Connection\n");
+        exit(2);
+    }
 }
 
 void send_id() {

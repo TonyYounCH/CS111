@@ -213,8 +213,8 @@ void setup_ssl() {
 		fprintf(stderr, "Failed to setup ssl\n");
 		exit(2);
 	}
-	if(SSL_set_fd(ssl, socket_fd)<0) {
-		fprintf(stderr, "Failed to associate socket_fd -> ssl\n");
+	if(SSL_set_fd(ssl, sock_fd)<0) {
+		fprintf(stderr, "Failed to associate sock_fd -> ssl\n");
 		exit(2);
 	}
 	if(SSL_connect(ssl) != 1){

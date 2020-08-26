@@ -190,28 +190,6 @@ float convert_temper_reading(int reading) {
 		return F;
 }
 
-void handle_scale(char scale) {
-    switch(scale){
-        case 'C':
-        case 'c':
-            flag = 'C';
-            if(log_flag && stop == 0){
-                dprintf(log_fd, "SCALE=C\n");
-            }
-            break;
-        case 'F':
-        case 'f':
-            flag = 'F';
-            if(log_flag && stop == 0){
-                dprintf(log_fd, "SCALE=F\n");
-            }
-            break;
-        default:
-            fprintf(stderr, "Incorrect scale option");
-            break;
-    }
-}
-
 void do_when_interrupted() {
 	char buf[256];
 	struct timespec ts;
@@ -228,69 +206,42 @@ void do_when_interrupted() {
 	exit(0);
 }
 
-void handle_off() {
-    if(log_flag){
-        dprintf(log_fd, "OFF\n");
-    }
-    do_when_interrupted();
-}
-
-void handle_period(int newPeriod) {
-    period = newPeriod;
-    if(log_flag && stop == 0){
-        dprintf(log_fd, "PERIOD=%d\n", period);
-    }
-}
-
-void handle_stop() {
-    stop = 1;
-    if(log_flag){
-        dprintf(log_fd, "STOP\n");
-    }
-}
-
-void handle_start() {
-    stop = 0;
-    if(log_flag){
-        dprintf(log_fd, "START\n");
-    }
-}
-
-void handle_log(const char* input) {
-    if(log_flag){
-        dprintf(log_fd, "%s\n", input);
-    }
-}
-
-
-void handle_input(const char* input) {
-    if(strcmp(input, "OFF") == 0){
-        handle_off();
-    }
-    else if(strcmp(input, "START") == 0){
-        handle_start();
-    }
-    else if(strcmp(input, "STOP") == 0){
-        handle_stop();
-    }
-    else if(strcmp(input, "SCALE=F") == 0){
-        handle_scale('F');
-    }
-    else if(strcmp(input, "SCALE=C") == 0){
-        handle_scale('C');
-    }
-    else if(strncmp(input, "PERIOD=", sizeof(char)*7) == 0){
-        int newPeriod = (int)atoi(input+7);
-        handle_period(newPeriod);
-    }
-    else if((strncmp(input, "LOG", sizeof(char)*3) == 0)){
-        handle_log(input);
-    }
-    else {
-        fprintf(stderr, "Command not recognized\n");
+// This function processes stdin
+void process_stdin(char *input) {
+    if(strcmp(input, "SCALE=F") == 0){
+        flag = 'F';
+        if(log_flag)
+            dprintf(log_fd, "SCALE=F\n");
+    } else if(strcmp(input, "SCALE=C") == 0){
+        flag = 'C';
+        if(log_flag)
+            dprintf(log_fd, "SCALE=C\n");
+    } else if(strncmp(input, "PERIOD=", sizeof(char)*7) == 0){
+        period = (int)atoi(input+7);
+        if(log_flag)
+            dprintf(log_fd, "PERIOD=%d\n", period);
+    } else if(strcmp(input, "STOP") == 0){
+        stop = 1;
+        if(log_flag)
+            dprintf(log_fd, "STOP\n");
+    } else if(strcmp(input, "START") == 0){
+        stop = 0;
+        if(log_flag)
+            dprintf(log_fd, "START\n");
+    } else if((strncmp(input, "LOG", sizeof(char)*3) == 0)){
+        if(log_flag){
+            dprintf(log_fd, "%s\n", input);
+        }
+    } else if(strcmp(input, "OFF") == 0){
+        if(log_flag)
+            dprintf(log_fd, "OFF\n");
+        do_when_interrupted();
+    } else {
+        fprintf(stderr, "Command cannot be recognized\n");
         exit(1);
     }
 }
+
 
 void deinit_sensors(){
     mraa_aio_close(temp);
@@ -345,7 +296,7 @@ void setupPollandTime(){
                 int i;
                 for(i = 0; i < num && copyIndex < 128; i++){
                     if(commandBuff[i] =='\n'){
-                        handle_input((char*)&copyBuff);
+                        process_stdin((char*)&copyBuff);
                         copyIndex = 0;
                         memset(copyBuff, 0, 128); //clear
                     }

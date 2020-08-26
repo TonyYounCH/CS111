@@ -47,15 +47,17 @@ void mraa_deinit() {
 #include <string.h>
 #include <math.h>
 #include <poll.h>
+#include <signal.h>
+#include <sys/errno.h>
+#include <sys/types.h>
 #include <time.h>
 #include <sys/time.h>
 #include <ctype.h>
-#include "fcntl.h"
+#include <fcntl.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <openssl/ssl.h>
-#include <openssl/err.h>
 
 #define PERIOD 'p'
 #define SCALE 's'
@@ -63,30 +65,30 @@ void mraa_deinit() {
 #define ID 'i'
 #define HOST 'h'
 
-//** REMEMBER TO CHANGE EXIT CODES
-
-time_t begin = 0;
-time_t end = 0;
 int period = 1;
 char scale = 'F';
-int log_fd;
-int log_flag = 0;
 int stop = 0;
+time_t begin = 0;
+time_t end = 0;
+int log_flag = 0;
+int log_fd = -1;
 int port;
-int sock_fd = 0;
-struct sockaddr_in server_address;
-struct hostent *server;
-char* hostname = NULL;
-char* id;
+
 mraa_aio_context temp;
+
+struct hostent *server;
+char* hostname = "";
+char* id;
+struct sockaddr_in server_address;
+int sock_fd = 0;
 SSL* ssl;
+
 
 void print_to_server(char *str) {
 	if(SSL_write(ssl, str, strlen(str)) < 0){
 		fprintf(stderr, "Failed to write to ssl\n");
 	}
 }
-
 // This shuts down and prints SHUTDOWN message to output
 void do_when_interrupted() {
 	char buf[256];
@@ -103,7 +105,6 @@ void do_when_interrupted() {
 	SSL_free(ssl);
 	exit(0);
 }
-
 
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
@@ -232,26 +233,17 @@ void setup_ssl() {
 	}
 }
 
-void send_id() {
-	char buffer[64];
-	setup_ssl();
-	sprintf(buffer, "ID=%s\n", id);
-	print_to_server(buffer);
-	dprintf(log_fd, "ID=%s\n", id);
-}
-
-
-int main(int argc, char** argv){
+int main(int argc, char* argv[]) {
 	int opt = 0;
-	static struct option options [] = {
-		{"period", 1, 0, 'p'},
-		{"scale", 1, 0, 's'},
-		{"log", 1, 0, 'l'},
-		{"id", 1, 0, 'i'},
-		{"host", 1, 0, 'h'},
+	struct option options[] = {
+		{"period", 1, NULL, PERIOD},
+		{"scale", 1, NULL, SCALE},
+		{"log", 1, NULL, LOG},
+		{"id", 1, NULL, ID},
+		{"host", 1, NULL, HOST},
 		{0, 0, 0, 0}
 	};
-	
+
 	while ((opt = getopt_long(argc, argv, "", options, NULL)) != -1) {
 		switch (opt) {
 			case PERIOD: 
@@ -308,9 +300,14 @@ int main(int argc, char** argv){
 		exit(1);
 	} 
 
-	// close(STDIN_FILENO); //close input
 	setup_connection();
-	send_id();
+	setup_ssl();
+
+	char buf[32];
+	sprintf(buf, "ID=%s\n", id);
+	print_to_server(buf);
+	dprintf(log_fd, "ID=%s\n", id);
+
 	initialize_the_sensors();
 
 	struct pollfd pollfd;
@@ -351,12 +348,11 @@ int main(int argc, char** argv){
 		} 
 	}
 
-
 	mraa_aio_close(temp);
 	close(log_fd);
-	exit(0);
+
+	return 0;
+
+
+
 }
-//button is no longer used as a method of shutdown
-
-//IF IT DOENS'T WORK USE THE STRING THING FOR SSL
-

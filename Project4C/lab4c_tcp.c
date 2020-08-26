@@ -180,7 +180,7 @@ void process_stdin(char *input) {
 	}
 }
 
-
+// This function sets up a connection to server with hostname and port number
 void setup_connection() {
 	if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
 		fprintf(stderr, "Failed to create socket in client\n");

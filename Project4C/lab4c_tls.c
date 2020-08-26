@@ -69,7 +69,6 @@ time_t begin = 0;
 time_t end = 0;
 int period = 1;
 char flag = 'F';
-struct pollfd polls[1];
 int log_fd;
 int log_flag = 0;
 int stop = 0;
@@ -83,10 +82,27 @@ mraa_aio_context temp;
 SSL* ssl;
 
 void print_to_server(char *str) {
-    if(SSL_write(ssl, str, strlen(str) + 1) < 0){
+    if(SSL_write(ssl, str, strlen(str)) < 0){
         fprintf(stderr, "Failed to write to ssl\n");
     }
 }
+
+void do_when_interrupted() {
+    char buf[256];
+    struct timespec ts;
+    struct tm * tm;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    tm = localtime(&(ts.tv_sec));
+    sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
+    print_to_server(buf);
+    if(log_flag) {
+        dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
+    }
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    exit(0);
+}
+
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
     char buf[256];
@@ -137,22 +153,6 @@ void initialize_the_sensors() {
 		fprintf(stderr, "Failed to init aio\n");
 		exit(1);
 	}
-}
-
-void do_when_interrupted() {
-	char buf[256];
-	struct timespec ts;
-	struct tm * tm;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	tm = localtime(&(ts.tv_sec));
-	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	print_to_server(buf);
-	if(log_flag) {
-		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	}
-	SSL_shutdown(ssl);
-	SSL_free(ssl);
-	exit(0);
 }
 
 // This function processes stdin

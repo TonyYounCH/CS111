@@ -96,7 +96,7 @@ void do_when_interrupted() {
 	struct tm * tm;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	tm = localtime(&(ts.tv_sec));
-	dprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	print_to_server(buf);
 	if(log_flag) {
 		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);

@@ -88,6 +88,71 @@ void print_to_server(char *str) {
         fprintf(stderr, "Failed to write to ssl\n");
     }
 }
+void print_errors(char* error){
+    if(strcmp(error, "temp") == 0){
+        fprintf(stderr, "Failed to initialize temperature sensor\n");
+        mraa_deinit();
+        exit(1);
+    }
+    if(strcmp(error, "usage") == 0) {
+        fprintf(stderr, "Incorrect argument: correct usage is ./lab4a --period=# [--scale=tempOpt] [--log=filename]\n");
+        exit(1);
+    }
+    if(strcmp(error, "file") == 0) {
+        fprintf(stderr, "Failed to create file\n");
+        exit(2);
+    }
+    if(strcmp(error, "poll") == 0){
+        fprintf(stderr, "Failed to poll\n");
+        exit(2);
+    }
+    if(strcmp(error, "read") == 0){
+        fprintf(stderr, "Failed to read\n");
+        exit(2);
+    }
+    if(strcmp(error, "period") == 0){
+        fprintf(stderr, "Period of 0 is not legal\n");
+        exit(1);
+    }
+    if(strcmp(error, "socket") == 0){
+        fprintf(stderr, "Error creating socket\n");
+        exit(2);
+    }
+    if(strcmp(error, "connection") == 0){
+        fprintf(stderr, "Error establishing connection to server\n");
+        exit(2);
+    }
+    if(strcmp(error, "id_length") == 0){
+        fprintf(stderr, "ID length is not 9. Inavlid ID\n");
+        exit(1);
+    }
+    if(strcmp(error, "host") == 0){
+        fprintf(stderr, "failed to get host name\n");
+        exit(1);
+    }
+    if(strcmp(error, "ssl") == 0){
+        fprintf(stderr, "failed to initialize SSL\n");
+        exit(1);
+    }
+    if(strcmp(error, "ctx") == 0){
+        fprintf(stderr, "failed to intialize SSL context\n");
+        exit(2);
+    }
+    if(strcmp(error, "ssl conenction") == 0){
+        fprintf(stderr, "failed to establish ssl connection\n");
+        exit(2);
+    }
+    if(strcmp(error, "ssl write") == 0){
+        fprintf(stderr, "failed to do write over SSL\n");
+        exit(2);
+    }
+    if(strcmp(error, "set_fd") == 0){
+        fprintf(stderr, "failed to associate file descriptor\n");
+        exit(2);
+    }
+}
+
+
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
     char buf[256];
@@ -208,7 +273,6 @@ void setup_connection() {
 		exit(1);
 	}
 }
-
 void setup_ssl() {
 	OpenSSL_add_all_algorithms();
 	SSL_library_init();
@@ -230,6 +294,15 @@ void setup_ssl() {
 		exit(2);
 	}
 }
+
+void send_id() {
+    char buffer[64];
+    setup_ssl();
+    sprintf(buffer, "ID=%s\n", id);
+    print_to_server(buffer);
+    dprintf(log_fd, "ID=%s\n", id);
+}
+
 
 int main(int argc, char** argv){
     int opt = 0;
@@ -300,14 +373,7 @@ int main(int argc, char** argv){
 
     // close(STDIN_FILENO); //close input
     setup_connection();
-    setup_ssl();
-
-    char buf[32];
-    sprintf(buf, "ID=%s", id);
-    print_to_server(buf);
-    dprintf(log_fd, "ID=%s\n", id);
-
-
+    send_id();
     initialize_the_sensors();
 
     struct pollfd pollfd;

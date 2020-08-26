@@ -47,17 +47,15 @@ void mraa_deinit() {
 #include <string.h>
 #include <math.h>
 #include <poll.h>
-#include <signal.h>
-#include <sys/errno.h>
-#include <sys/types.h>
 #include <time.h>
 #include <sys/time.h>
 #include <ctype.h>
-#include <fcntl.h>
+#include "fcntl.h"
 #include <sys/socket.h>
-#include <netdb.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define PERIOD 'p'
 #define SCALE 's'
@@ -149,7 +147,7 @@ void print_errors(char* error){
 }
 
 void print_to_server(char *str) {
-	if(SSL_write(ssl, str, strlen(str) + 1) < 0){
+	if(SSL_write(ssl, str, strlen(str)) < 0){
 		fprintf(stderr, "Failed to write to ssl\n");
 	}
 }

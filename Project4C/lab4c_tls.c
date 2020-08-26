@@ -233,18 +233,18 @@ void setup_ssl() {
 	}
 }
 
-void handle_scale(char scale) {
-    switch(scale){
+void handle_scale(char flag) {
+    switch(flag){
         case 'C':
         case 'c':
-            flag = 'C';
+            scale = 'C';
             if(log_flag && stop == 0){
                 dprintf(log_fd, "SCALE=C\n");
             }
             break;
         case 'F':
         case 'f':
-            flag = 'F';
+            scale = 'F';
             if(log_flag && stop == 0){
                 dprintf(log_fd, "SCALE=F\n");
             }

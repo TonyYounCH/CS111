@@ -65,23 +65,29 @@ void mraa_deinit() {
 
 //** REMEMBER TO CHANGE EXIT CODES
 
-time_t begin = 0;
-time_t end = 0;
 int period = 1;
 char flag = 'F';
-struct pollfd polls[1];
-int log_fd;
-int log_flag = 0;
 int stop = 0;
+time_t begin = 0;
+time_t end = 0;
+int log_flag = 0;
+int log_fd;
 int port;
-int sock_fd = 0;
-struct sockaddr_in server_address;
-struct hostent *server;
-char* hostname = NULL;
-char* id;
+
 mraa_aio_context temp;
+
+struct hostent *server;
+char* hostname = "";
+char* id;
+struct sockaddr_in server_address;
+int sock_fd = 0;
 SSL* ssl;
 
+void print_to_server(char *str) {
+    if(SSL_write(ssl, str, strlen(str) + 1) < 0){
+        fprintf(stderr, "Failed to write to ssl\n");
+    }
+}
 void print_errors(char* error){
     if(strcmp(error, "temp") == 0){
         fprintf(stderr, "Failed to initialize temperature sensor\n");
@@ -146,12 +152,6 @@ void print_errors(char* error){
     }
 }
 
-void write_message(char* message) {
-    if(SSL_write(ssl, message, strlen(message))< 0){
-        print_errors("ssl write");
-    }
-}
-
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
     char buf[256];
@@ -160,7 +160,7 @@ void curr_temp_report(float temperature){
     clock_gettime(CLOCK_REALTIME, &ts);
     tm = localtime(&(ts.tv_sec));
     sprintf(buf, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-    write_message(buf);
+    print_to_server(buf);
     if(log_flag && !stop) {
         dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
     }
@@ -211,7 +211,7 @@ void do_when_interrupted() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	tm = localtime(&(ts.tv_sec));
 	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	write_message(buf);
+	print_to_server(buf);
 	if(log_flag) {
 		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
@@ -352,7 +352,7 @@ void send_id() {
     char buffer[64];
     setup_ssl();
     sprintf(buffer, "ID=%s\n", id);
-    write_message(buffer);
+    print_to_server(buffer);
     dprintf(log_fd, "ID=%s\n", id);
 }
 

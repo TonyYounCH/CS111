@@ -151,7 +151,7 @@ void write_message(char* message) {
     }
 }
 
-void create_report(flaot temperature) {
+void create_report(float temperature) {
 	char buf[256];
 	struct timespec ts;
 	struct tm * tm;

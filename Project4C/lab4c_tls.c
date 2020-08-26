@@ -151,7 +151,7 @@ void write_message(char* message) {
     }
 }
 
-void create_report(double temperature) {
+void create_report(flaot temperature) {
 	char buf[256];
 	struct timespec ts;
 	struct tm * tm;
@@ -184,7 +184,7 @@ float convert_temper_reading(int reading) {
 	float C = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
 	//F is the temperature in Fahrenheit
 	float F = (C * 9)/5 + 32;
-	if(scale == 'C')
+	if(flag == 'C')
 		return C;
 	else
 		return F;
@@ -219,7 +219,7 @@ void do_when_interrupted() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	tm = localtime(&(ts.tv_sec));
 	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	print_to_server(buf);
+	write_message(buf);
 	if(log_flag) {
 		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
@@ -325,7 +325,7 @@ void setupPollandTime(){
     polls[0].events = POLLIN | POLLERR | POLLHUP;
     for(;;){
         int value = mraa_aio_read(temp);
-        double tempValue = convert_temper_reading(value);
+        float tempValue = convert_temper_reading(value);
         if(!stop){
             create_report(tempValue);
         }

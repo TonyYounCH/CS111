@@ -68,7 +68,7 @@ void mraa_deinit() {
 time_t begin = 0;
 time_t end = 0;
 int period = 1;
-char flag = 'F';
+char scale = 'F';
 int log_fd;
 int log_flag = 0;
 int stop = 0;
@@ -261,7 +261,7 @@ int main(int argc, char** argv){
 			case SCALE:
 				// get iteration #
 				if (optarg[0] == 'F' || optarg[0] == 'C') {
-					flag = optarg[0];
+					scale = optarg[0];
 				} else {
 					fprintf(stderr, "Invalid argument(s)\n--scale option only accepts [C, F]\n");
 					exit(1);

@@ -235,6 +235,52 @@ void print_msg(char *str, int to_server) {
 	dprintf(log_fd, "ID=%s\n", str);
 }
 
+void setupPollandTime(){
+    char commandBuff[128];
+    char copyBuff[128];
+    memset(commandBuff, 0, 128);
+    memset(copyBuff, 0, 128);
+    int copyIndex = 0;
+    polls[0].fd = sock_fd;
+    polls[0].events = POLLIN | POLLERR | POLLHUP;
+    for(;;){
+        int value = mraa_aio_read(sensor);
+        double tempValue = convert_temper_reading(value);
+        if(!stopReports){
+            curr_temp_report(tempValue);
+        }
+        time_t begin, end;
+        time(&begin);
+        time(&end); //start begin and end at the same time and keep running loop until period is reached
+        while(difftime(end, begin) < period){
+            int ret = poll(polls, 1, 0);
+            // if(ret < 0){
+            //     print_errors("poll");
+            // }
+            if(polls[0].revents && POLLIN){
+                int num = SSL_read(ssl, commandBuff, 128);
+                // if(num < 0){
+                //     print_errors("read");
+                // }
+                int i;
+                for(i = 0; i < num && copyIndex < 128; i++){
+                    if(commandBuff[i] =='\n'){
+                        handle_input((char*)&copyBuff);
+                        copyIndex = 0;
+                        memset(copyBuff, 0, 128); //clear
+                    }
+                    else {
+                        copyBuff[copyIndex] = commandBuff[i];
+                        copyIndex++;
+                    }
+                }
+                
+            }
+            time(&end);
+        }
+    }
+}//help with time https://www.tutorialspoint.com/c_standard_library/c_function_time.htm
+
 int main(int argc, char* argv[]) {
 	int opt = 0;
 	struct option options[] = {
@@ -310,44 +356,44 @@ int main(int argc, char* argv[]) {
 	print_msg(buf, 1);
 
 	initialize_the_sensors();
+	setupPollandTime();
+	// struct pollfd pollfd;
+	// pollfd.fd = sock_fd;
+	// pollfd.events = POLLIN;
 
-	struct pollfd pollfd;
-	pollfd.fd = sock_fd;
-	pollfd.events = POLLIN;
+	// char buffer[256];
+	// char full_command[256];
+	// memset(buffer, 0, 256);
+	// memset(full_command, 0, 256);
+	// int index = 0;
+	// while (1) {
+	// 	// if it is time to report temperature && !stop
+	// 	// read from temperature sensor, convert and report
+	// 	report_temp();
 
-	char buffer[256];
-	char full_command[256];
-	memset(buffer, 0, 256);
-	memset(full_command, 0, 256);
-	int index = 0;
-	while (1) {
-		// if it is time to report temperature && !stop
-		// read from temperature sensor, convert and report
-		report_temp();
-
-		 // use poll syscalls, no or very short< 50ms timeout interval
-		if(poll(&pollfd, 1, 0) < 0){
-			fprintf(stderr, "Failed to read from poll\n");
-		}
-		if(pollfd.revents && POLLIN){
-			int res = SSL_read(ssl, buffer, 256);
-			if(res < 0){
-				fprintf(stderr, "Failed to read from STDIN_FILENO\n");
-			}
-			int i;
-			for(i = 0; i < res && index < 256; i++){
-				if(buffer[i] =='\n'){
-					process_stdin((char*)&full_command);
-					index = 0;
-					memset(full_command, 0, 256);
-				} else {
-					full_command[index] = buffer[i];
-					index++;
-				}
-			}
+	// 	 // use poll syscalls, no or very short< 50ms timeout interval
+	// 	if(poll(&pollfd, 1, 0) < 0){
+	// 		fprintf(stderr, "Failed to read from poll\n");
+	// 	}
+	// 	if(pollfd.revents && POLLIN){
+	// 		int res = SSL_read(ssl, buffer, 256);
+	// 		if(res < 0){
+	// 			fprintf(stderr, "Failed to read from STDIN_FILENO\n");
+	// 		}
+	// 		int i;
+	// 		for(i = 0; i < res && index < 256; i++){
+	// 			if(buffer[i] =='\n'){
+	// 				process_stdin((char*)&full_command);
+	// 				index = 0;
+	// 				memset(full_command, 0, 256);
+	// 			} else {
+	// 				full_command[index] = buffer[i];
+	// 				index++;
+	// 			}
+	// 		}
 			
-		} 
-	}
+	// 	} 
+	// }
 
 	mraa_aio_close(temp);
 	close(log_fd);

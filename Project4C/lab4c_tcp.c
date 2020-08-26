@@ -181,7 +181,7 @@ void process_stdin(char *input) {
 }
 
 
-void setup_tcp() {
+void setup_connection() {
 	if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
 		fprintf(stderr, "Failed to create socket in client\n");
 	}
@@ -265,7 +265,7 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	} 
 
-	setup_tcp();
+	setup_connection();
 	dprintf(sock_fd, "ID=%s\n", id);
 	dprintf(log_fd, "ID=%s\n", id);
 	initialize_the_sensors();
@@ -309,7 +309,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	mraa_aio_close(temp);
-
+	close(log_fd);
+	
 	return 0;
 
 

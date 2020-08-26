@@ -78,7 +78,7 @@ struct sockaddr_in address;
 struct hostent *server;
 char* hostname = NULL;
 char* id;
-mraa_aio_context sensor;
+mraa_aio_context temp;
 SSL* ssl;
 
 void print_errors(char* error){
@@ -152,17 +152,6 @@ void write_message(char* message) {
 }
 
 void create_report(double temperature) {
-    // char buff[256];
-    // time_t raw;
-    // struct tm* currTime;
-    // time(&raw);
-    // currTime = localtime(&raw);
-    // sprintf(buff, "%.2d:%.2d:%.2d %.1f\n", currTime->tm_hour, currTime->tm_min, currTime->tm_sec, temp);
-    // write_message(buff);
-    // if(log_flag && stop == 0) {
-    //     dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", currTime->tm_hour, currTime->tm_min, currTime->tm_sec, temp);
-    // }
-
 	char buf[256];
 	struct timespec ts;
 	struct tm * tm;
@@ -175,19 +164,31 @@ void create_report(double temperature) {
 	}
 }//help with time from https://www.tutorialspoint.com/c_standard_library/c_function_localtime.htm
 
-void initSensors(){
-    sensor = mraa_aio_init(1);
-    if(sensor == NULL){
-        print_errors("temp");
-    }
+
+// Initializes the sensors
+void initialize_the_sensors() {
+	temp = mraa_aio_init(1);
+	if (temp == NULL) {
+		fprintf(stderr, "Failed to init aio\n");
+		exit(1);
+	}
 }
 
-double getTemp(int tempReading){
-    double  temp = 1023.0 / (double)tempReading - 1.0;
-    temp *= R0;
-    float temperature = 1.0/(log(temp/R0)/B+1/298.15) - 273.15;
-    return flag == 'C'? temperature: temperature*9/5 + 32; //convert to Fahrenheit
-}//algorithm from http://wiki.seeedstudio.com/Grove-Temperature_Sensor_V1.2/
+// convert whatever output from the seonsor to desired scale
+float convert_temper_reading(int reading) {
+	float R = 1023.0/((float) reading) - 1.0;
+	float R0 = 100000.0;
+	float B = 4275;
+	R = R0*R;
+	//C is the temperature in Celcious
+	float C = 1.0/(log(R/R0)/B + 1/298.15) - 273.15;
+	//F is the temperature in Fahrenheit
+	float F = (C * 9)/5 + 32;
+	if(scale == 'C')
+		return C;
+	else
+		return F;
+}
 
 void handle_scale(char scale) {
     switch(scale){
@@ -211,25 +212,27 @@ void handle_scale(char scale) {
     }
 }
 
-void handle_shutdown() {
-    time_t raw;
-    struct tm* currTime;
-    time(&raw);
-    currTime = localtime(&raw);
-    char buff[256];
-    sprintf(buff, "%.2d:%.2d:%.2d SHUTDOWN\n", currTime->tm_hour, currTime->tm_min, currTime->tm_sec);
-    write_message(buff);
-    if(log_flag) {
-        dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", currTime->tm_hour, currTime->tm_min, currTime->tm_sec);
-    }
-    exit(0);
+void do_when_interrupted() {
+	char buf[256];
+	struct timespec ts;
+	struct tm * tm;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	tm = localtime(&(ts.tv_sec));
+	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	print_to_server(buf);
+	if(log_flag) {
+		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	}
+	SSL_shutdown(ssl);
+	SSL_free(ssl);
+	exit(0);
 }
 
 void handle_off() {
     if(log_flag){
         dprintf(log_fd, "OFF\n");
     }
-    handle_shutdown();
+    do_when_interrupted();
 }
 
 void handle_period(int newPeriod) {
@@ -294,24 +297,23 @@ void deinit_sensors(){
     close(log_fd);
 }
 
-void setupConnection() {
-    socketFd = socket(AF_INET, SOCK_STREAM, 0);
-    if(socketFd < 0){
-        print_errors("socket");
-    }
-    server = gethostbyname(hostname);
-    if (server == NULL){
-        print_errors("host");
-    } //check if hostname is retrieved
-    memset((char*)&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    bcopy((char*)server->h_addr, (char*)&address.sin_addr.s_addr, server->h_length);
-    address.sin_port = htons(port);
-    if(connect(socketFd, (struct sockaddr*)&address, sizeof(address))< 0){
-        print_errors("connection");
-    }
-}
 
+void setup_connection() {
+	if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+		fprintf(stderr, "Failed to create socket in client\n");
+	}
+	if ((server = gethostbyname(hostname)) == NULL){
+		fprintf(stderr, "No host\n");
+	}
+	memset((void*)&server_address, 0, sizeof(server_address));
+	server_address.sin_family = AF_INET;
+	memcpy((char *) &server_address.sin_addr.s_addr, (char *) server->h_addr, server->h_length);
+	server_address.sin_port = htons(port);
+	if(connect(sock_fd, (struct sockaddr*) &server_address, sizeof(server_address))< 0){
+		fprintf(stderr, "Failed to connect to socket\n");
+		exit(1);
+	}
+}
 
 void setupPollandTime(){
     char commandBuff[128];
@@ -323,7 +325,7 @@ void setupPollandTime(){
     polls[0].events = POLLIN | POLLERR | POLLHUP;
     for(;;){
         int value = mraa_aio_read(sensor);
-        double tempValue = getTemp(value);
+        double tempValue = convert_temper_reading(value);
         if(!stop){
             create_report(tempValue);
         }
@@ -359,27 +361,31 @@ void setupPollandTime(){
     }
 }//help with time https://www.tutorialspoint.com/c_standard_library/c_function_time.htm
 
-void initSSL() {
-    OpenSSL_add_all_algorithms();
-    if(SSL_library_init() < 0){
-        print_errors("ssl");
-    }
-    SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
-    if(ssl_ctx == NULL){
-        print_errors("ctx");
-    }
-    ssl = SSL_new(ssl_ctx);
-    if(SSL_set_fd(ssl, socketFd)<0) {
-        print_errors("set_fd");
-    }
-    if(SSL_connect(ssl) != 1){
-        print_errors("ssl connection");
-    }
-}//documentation from https://www.openssl.org/docs/manmaster/man7/ssl.html
+void setup_ssl() {
+	OpenSSL_add_all_algorithms();
+	SSL_library_init();
+	SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
+	if(ssl_ctx == NULL){
+		fprintf(stderr, "Failed to get ssl context\n");
+		exit(2);
+	}
+	if((ssl = SSL_new(ssl_ctx)) == NULL){
+		fprintf(stderr, "Failed to setup ssl\n");
+		exit(2);
+	}
+	if(SSL_set_fd(ssl, sock_fd)<0) {
+		fprintf(stderr, "Failed to associate sock_fd -> ssl\n");
+		exit(2);
+	}
+	if(SSL_connect(ssl) != 1){
+		fprintf(stderr, "Failed to establish ssl Connection\n");
+		exit(2);
+	}
+}
 
 void send_id() {
     char buffer[64];
-    initSSL();
+    setup_ssl();
     sprintf(buffer, "ID=%s\n", id);
     write_message(buffer);
     dprintf(log_fd, "ID=%s\n", id);
@@ -453,10 +459,10 @@ int main(int argc, char** argv){
 		exit(1);
 	} 
 
-    close(STDIN_FILENO); //close input
-    setupConnection();
+    // close(STDIN_FILENO); //close input
+    setup_connection();
     send_id();
-    initSensors();
+    initialize_the_sensors();
     setupPollandTime();
     deinit_sensors();
     exit(0);

@@ -82,76 +82,11 @@ char* id;
 mraa_aio_context temp;
 SSL* ssl;
 
-void print_errors(char* error){
-    if(strcmp(error, "temp") == 0){
-        fprintf(stderr, "Failed to initialize temperature sensor\n");
-        mraa_deinit();
-        exit(1);
-    }
-    if(strcmp(error, "usage") == 0) {
-        fprintf(stderr, "Incorrect argument: correct usage is ./lab4a --period=# [--scale=tempOpt] [--log=filename]\n");
-        exit(1);
-    }
-    if(strcmp(error, "file") == 0) {
-        fprintf(stderr, "Failed to create file\n");
-        exit(2);
-    }
-    if(strcmp(error, "poll") == 0){
-        fprintf(stderr, "Failed to poll\n");
-        exit(2);
-    }
-    if(strcmp(error, "read") == 0){
-        fprintf(stderr, "Failed to read\n");
-        exit(2);
-    }
-    if(strcmp(error, "period") == 0){
-        fprintf(stderr, "Period of 0 is not legal\n");
-        exit(1);
-    }
-    if(strcmp(error, "socket") == 0){
-        fprintf(stderr, "Error creating socket\n");
-        exit(2);
-    }
-    if(strcmp(error, "connection") == 0){
-        fprintf(stderr, "Error establishing connection to server\n");
-        exit(2);
-    }
-    if(strcmp(error, "id_length") == 0){
-        fprintf(stderr, "ID length is not 9. Inavlid ID\n");
-        exit(1);
-    }
-    if(strcmp(error, "host") == 0){
-        fprintf(stderr, "failed to get host name\n");
-        exit(1);
-    }
-    if(strcmp(error, "ssl") == 0){
-        fprintf(stderr, "failed to initialize SSL\n");
-        exit(1);
-    }
-    if(strcmp(error, "ctx") == 0){
-        fprintf(stderr, "failed to intialize SSL context\n");
-        exit(2);
-    }
-    if(strcmp(error, "ssl conenction") == 0){
-        fprintf(stderr, "failed to establish ssl connection\n");
-        exit(2);
-    }
-    if(strcmp(error, "ssl write") == 0){
-        fprintf(stderr, "failed to do write over SSL\n");
-        exit(2);
-    }
-    if(strcmp(error, "set_fd") == 0){
-        fprintf(stderr, "failed to associate file descriptor\n");
-        exit(2);
+void print_to_server(char *str) {
+    if(SSL_write(ssl, str, strlen(str) + 1) < 0){
+        fprintf(stderr, "Failed to write to ssl\n");
     }
 }
-
-void write_message(char* message) {
-    if(SSL_write(ssl, message, strlen(message))< 0){
-        print_errors("ssl write");
-    }
-}
-
 // This prints out executing time and read temperature 
 void curr_temp_report(float temperature){
     char buf[256];
@@ -160,7 +95,7 @@ void curr_temp_report(float temperature){
     clock_gettime(CLOCK_REALTIME, &ts);
     tm = localtime(&(ts.tv_sec));
     sprintf(buf, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-    write_message(buf);
+    print_to_server(buf);
     if(log_flag && !stop) {
         dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
     }
@@ -211,7 +146,7 @@ void do_when_interrupted() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	tm = localtime(&(ts.tv_sec));
 	sprintf(buf, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
-	write_message(buf);
+	print_to_server(buf);
 	if(log_flag) {
 		dprintf(log_fd, "%.2d:%.2d:%.2d SHUTDOWN\n", tm->tm_hour, tm->tm_min, tm->tm_sec);
 	}
@@ -306,7 +241,7 @@ void send_id() {
     char buffer[64];
     setup_ssl();
     sprintf(buffer, "ID=%s\n", id);
-    write_message(buffer);
+    print_to_server(buffer);
     dprintf(log_fd, "ID=%s\n", id);
 }
 

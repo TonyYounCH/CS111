@@ -74,7 +74,7 @@ int log_flag = 0;
 int stop = 0;
 int port;
 int sock_fd = 0;
-struct sockaddr_in address;
+struct sockaddr_in server_address;
 struct hostent *server;
 char* hostname = NULL;
 char* id;
@@ -293,7 +293,7 @@ void handle_input(const char* input) {
 }
 
 void deinit_sensors(){
-    mraa_aio_close(sensor);
+    mraa_aio_close(temp);
     close(log_fd);
 }
 
@@ -324,7 +324,7 @@ void setupPollandTime(){
     polls[0].fd = sock_fd;
     polls[0].events = POLLIN | POLLERR | POLLHUP;
     for(;;){
-        int value = mraa_aio_read(sensor);
+        int value = mraa_aio_read(temp);
         double tempValue = convert_temper_reading(value);
         if(!stop){
             create_report(tempValue);

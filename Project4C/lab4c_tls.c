@@ -258,14 +258,14 @@ void setupPollandTime(){
             //     print_errors("poll");
             // }
             if(polls[0].revents && POLLIN){
-                SSL_read(ssl, commandBuff, 128);
+                int num = SSL_read(ssl, commandBuff, 128);
                 // if(num < 0){
                 //     print_errors("read");
                 // }
                 int i;
                 for(i = 0; i < num && copyIndex < 128; i++){
                     if(commandBuff[i] =='\n'){
-                        handle_input((char*)&copyBuff);
+                        process_stdin((char*)&copyBuff);
                         copyIndex = 0;
                         memset(copyBuff, 0, 128); //clear
                     }

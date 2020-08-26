@@ -444,6 +444,43 @@ void setupPollandTime(){
     }
 }//help with time https://www.tutorialspoint.com/c_standard_library/c_function_time.htm
 
+void setupConnection() {
+    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sock_fd < 0){
+        print_errors("socket");
+    }
+    server = gethostbyname(hostname);
+    if (server == NULL){
+        print_errors("host");
+    } //check if hostname is retrieved
+    memset((char*)&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    bcopy((char*)server->h_addr, (char*)&server_address.sin_addr.s_addr, server->h_length);
+    server_address.sin_port = htons(portNum);
+    if(connect(sock_fd, (struct sockaddr*)&server_address, sizeof(server_address))< 0){
+        print_errors("connection");
+    }
+}
+
+
+void initSSL() {
+    OpenSSL_add_all_algorithms();
+    if(SSL_library_init() < 0){
+        print_errors("ssl");
+    }
+    SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
+    if(ssl_ctx == NULL){
+        print_errors("ctx");
+    }
+    ssl = SSL_new(ssl_ctx);
+    if(SSL_set_fd(ssl, sock_fd)<0) {
+        print_errors("set_fd");
+    }
+    if(SSL_connect(ssl) != 1){
+        print_errors("ssl connection");
+    }
+}//documentation from https://www.openssl.org/docs/manmaster/man7/ssl.html
+
 int main(int argc, char* argv[]) {
 	int opt = 0;
 	struct option options[] = {
@@ -520,8 +557,10 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	} 
 
-	setup_connection();
-	setup_ssl();
+	// setup_connection();
+	setupConnection();
+	// setup_ssl();
+	initSSL();
 
 	char buf[32];
 	sprintf(buf, "ID=%s", id);

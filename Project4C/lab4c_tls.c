@@ -57,6 +57,12 @@ void mraa_deinit() {
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#define PERIOD 'p'
+#define SCALE 's'
+#define LOG 'l'
+#define ID 'i'
+#define HOST 'h'
+
 //** REMEMBER TO CHANGE EXIT CODES
 const int B = 4275;               // B value of the thermistor
 const int R0 = 100000;            // R0 = 100k

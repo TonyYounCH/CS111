@@ -151,18 +151,31 @@ void write_message(char* message) {
     }
 }
 
-void create_report(float temperature) {
-	char buf[256];
-	struct timespec ts;
-	struct tm * tm;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	tm = localtime(&(ts.tv_sec));
-	sprintf(buf, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-	write_message(buf);
-	if(log_flag && !stop) {
-		dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
-	}
-}//help with time from https://www.tutorialspoint.com/c_standard_library/c_function_localtime.htm
+// This prints out executing time and read temperature 
+void curr_temp_report(float temperature){
+    char buf[256];
+    struct timespec ts;
+    struct tm * tm;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    tm = localtime(&(ts.tv_sec));
+    sprintf(buf, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
+    print_to_server(buf);
+    if(log_flag && !stop) {
+        dprintf(log_fd, "%.2d:%.2d:%.2d %.1f\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temperature);
+    }
+}
+
+void report_temp() {
+    // if it is time to report temperature && !stop
+    // read from temperature sensor, convert and report
+    time(&end);
+    if(difftime(end, begin) >= period && !stop) {
+        time(&begin);
+        int reading = mraa_aio_read(temp);
+        float temperature = convert_temper_reading(reading);
+        curr_temp_report(temperature);
+    }
+}
 
 
 // Initializes the sensors

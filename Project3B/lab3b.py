@@ -4,43 +4,18 @@
 #EMAIL: tonyyoun2@gmail.com
 #ID: 304207830
 
-import sys # for opening the argument file
+import sys
 
-# key: block number
-# value: [ [inode number, offset, level] ]
-block_dict = {} 
+block_dict = dict() 
+inode_dict_lc = dict() 
+inode_dict_reflc = dict()
+inode_dict_lr = dict()
+inode_dict_parents = dict()
+ref_inode = dict()
+bfree = list()
+ifree = list()
 
-# key: inode number
-# value: link count
-inode_dict_lc = {} 
-
-# key: inode number
-# value: ref link count
-inode_dict_reflc = {}
-
-# key: inode number
-# value: parent inode
-inode_dict_lr = {}
-
-# key: parent inode number
-# value: inode number
-# stores only '..' directories
-inode_dict_parents = {}
-
-# referenced inodes
-# key: inode number
-# value: diredctory name
-ref_inode = {}
-
-# set of free blocks
-bfree = set()
-
-# set of free inodes
-ifree = set()
-
-
-# set of reserved blocks
-reserved_blocks = set([0, 1, 2, 3, 4, 5, 6, 7, 64])
+reserved_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 64]
 
 total_blocks = 0
 total_inodes = 0
@@ -49,7 +24,6 @@ linkcount = 0
 links = 0
 damaged = False
 
-# open the file from the command line argument
 try:
 	input_file = open(sys.argv[1], "r")
 except:
@@ -57,7 +31,6 @@ except:
 	exit(1)
 
 lines = input_file.readlines()
-# parse the input file
 for i in lines:
 	entry = i.split(",")
 	summary_type = entry[0]

@@ -207,7 +207,7 @@ def main():
 	try:
 		input_file = open(sys.argv[1], "r")
 	except:
-		sys.stderr.write('file does not exist\n')
+		sys.stderr.write("Error. Cannot open file" + '\n')
 		exit(1)
 
 	exitcode = 0;

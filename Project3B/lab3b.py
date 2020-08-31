@@ -9,9 +9,8 @@ from sets import Set
 import sys
 
 blocks = defaultdict(list)
-damaged = False
-
 def blockData(file):
+	correct = True
 	file.seek(0)
 	for line in file:
 		fields = line.split(',')
@@ -74,7 +73,7 @@ def blockData(file):
 			continue
 		while i != blocknum and i < 64:
 			sys.stdout.write('UNREFERENCED BLOCK '+str(i)+'\n')
-			damaged = True
+			correct = False
 			i = i + 1
 		i = i + 1
 
@@ -93,7 +92,7 @@ def blockData(file):
 					num_references = num_references + 1
 			if allocated_and_free[0] == 1 and allocated_and_free[1] == 1:
 				sys.stdout.write('ALLOCATED BLOCK '+str(blocknum)+' ON FREELIST'+'\n')
-				damaged = True
+				correct = False
 			if num_references > 1:
 				for item in lst: #yeah, I looped over it again... maybe there's a better way to do this
 					if item[0] != 'free':
@@ -103,7 +102,7 @@ def blockData(file):
 						inum = item[1]
 						offset = item[2]
 						sys.stdout.write('DUPLICATE '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
-						damaged = True
+						correct = False
 
 
 			#sys.stdout.write('DUPLICATE')
@@ -119,16 +118,17 @@ def blockData(file):
 				if typ != '':
 					typ += ' '
 				sys.stdout.write('INVALID '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
-				damaged = True
+				correct = False
 
 			#check reserved
 			if blocknum > 0 and blocknum < first_valid_block:
 				if typ != '':
 					typ += ' '
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
-				damaged = True
+				correct = False
 
 def inodeDirCheck(file):
+	correct = True
 	freenodes = Set()
 	linkCounts = dict()
 	file.seek(0)
@@ -159,20 +159,20 @@ def inodeDirCheck(file):
 			inodeNum = int(fields[1])
 			if inodeNum in freenodes:
 				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
-				damaged = True
+				correct = False
 			allocnodes.add(inodeNum)
 			linkCnt = int(fields[6])
 			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
-				damaged = True
+				correct = False
 			elif inodeNum not in linkCounts:
 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
-				damaged = True
+				correct = False
 	#After we know which nodes are allocated, check for missing unallocated node entries
 	for x in range(firstNode,numNodes + 1):
 		if x not in freenodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
-			damaged = True
+			correct = False
 	file.seek(0)
 	for rawline in file:
 		line = rawline.rstrip('\r\n')
@@ -183,40 +183,38 @@ def inodeDirCheck(file):
 			dirNum = int(fields[1])
 			if inodeNum not in allocnodes and inodeNum in range (1,numNodes + 1):
 				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
-				damaged = True
+				correct = False
 			elif inodeNum < 1 or inodeNum > numNodes:
 				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
-				damaged = True
+				correct = False
 			name = fields[6]
 			if fields[6] == "'.'":
 				if fields[3] != fields[1]:
 					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + fields[1] + '\n')
-					damaged = True
+					correct = False
 			if fields[6] == "'..'":
 				if int(fields[3]) != parentInode[int(fields[1])]:
 					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + str(parentInode[int(fields[1])]) + '\n')
-					damaged = True                 
-	return damaged
+					correct = False                 
+	return correct
 
 
  
 def main():
 	if len(sys.argv) != 2:
-		print('Usage Error: ./lab3b fileName', file=sys.stderr)
+		sys.stderr.write("must provide one argument: name of csv file" + '\n')
 		exit(1)
-
 	try:
-		input_file = open(sys.argv[1], "r")
-	except:
-		sys.stderr.write('file does not exist\n')
+		infile = open(sys.argv[1])
+	except IOError:
+		sys.stderr.write("Error. Cannot open file" + '\n')
 		exit(1)
-
 	exitcode = 0;
-	if blockData(input_file):
+	if not blockData(infile):
 		exitcode = 2
-	if inodeDirCheck(input_file):
+	if not inodeDirCheck(infile):
 		exitcode = 2
-	input_file.close()
+	infile.close()
 	exit(exitcode)
 
 if __name__ == '__main__':

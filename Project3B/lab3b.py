@@ -202,8 +202,8 @@ def inodeDirCheck(file):
  
 def main():
 	if len(sys.argv) != 2:
-		sys.stderr.write("must provide one argument: name of csv file" + '\n')
-		exit(1)
+		print('Usage Error: ./lab3b fileName', file=sys.stderr)
+		sys.exit(1)
 	try:
 		infile = open(sys.argv[1])
 	except IOError:

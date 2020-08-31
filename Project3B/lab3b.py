@@ -5,7 +5,7 @@
 #ID: 304207830
 
 import sys
-import csv
+import csv 
 
 isConsistent = True
 
@@ -242,57 +242,57 @@ def directory_consistency_audit(list_dirent, super_block, inode_num_list, inode_
     #This would probably be the method you need to modify so that it supports the last part of directory checking -> checking for the correctness of '.' and '..'
 
 
-def read_csv(filename):
-    super_block = None
-    group = None
-    inode_list = []
-    list_free_blocks = []
-    list_free_inodes = []
-    list_indirect = []
-    list_dirent = []
-    inode_num_list = []
 
-    try:
-            with open(filename) as csv_file:
-                csv_reader = csv.reader(csv_file)
-                for field in csv_reader:
-                    if field[0] == 'SUPERBLOCK':
-                        super_block = SuperBlock(field)
-                    if field[0] == 'INODE':
-                        inode_list.append(Inode(field))
-                    if field[0] == 'GROUP':
-                        group = Group(field)
-                    if field[0] == 'IFREE':
-                        list_free_inodes.append(int(field[1]))
-                        # put the number of the free inode in the list
-                    if field[0] == 'BFREE':
-                        list_free_blocks.append(int(field[1]))
-                        #put the number of the block in the list
-                    if field[0] == 'INDIRECT':
-                        list_indirect.append(Indirect(field))
-                    if field[0] == 'DIRENT':
-                        list_dirent.append(Dirent(field))
+if len(sys.argv) != 2:
+	print('Usage Error: ./lab3b fileName', file=sys.stderr)
+	sys.exit(1)
+
+try:
+	input_file = open(sys.argv[1], "r")
+except:
+	sys.stderr.write('file does not exist\n')
+	exit(1)
+
+lines = input_file.readlines()
+
+for i in lines:
+	field = i.split(",")
 
 
-    except IOError:
-        print('Unable to read file', file=sys.stderr)
-        sys.exit(1)
+	super_block = None
+	group = None
+	inode_list = []
+	list_free_blocks = []
+	list_free_inodes = []
+	list_indirect = []
+	list_dirent = []
+	inode_num_list = []
 
-    inode_num_list = get_allocated_inode_nums(inode_list) #get inode numbers of allocated inodes from list -> helps with inode_allocation_audit
-    block_consistency_audit(super_block, group, list_free_blocks, inode_list, list_indirect)
-    inode_allocation_audit(inode_list, list_free_inodes, super_block, inode_num_list)
-    directory_consistency_audit(list_dirent, super_block, inode_num_list, inode_list)
+	if field[0] == 'SUPERBLOCK':
+		super_block = SuperBlock(field)
+	if field[0] == 'INODE':
+		inode_list.append(Inode(field))
+	if field[0] == 'GROUP':
+		group = Group(field)
+	if field[0] == 'IFREE':
+		list_free_inodes.append(int(field[1]))
+		# put the number of the free inode in the list
+	if field[0] == 'BFREE':
+		list_free_blocks.append(int(field[1]))
+		#put the number of the block in the list
+	if field[0] == 'INDIRECT':
+		list_indirect.append(Indirect(field))
+	if field[0] == 'DIRENT':
+		list_dirent.append(Dirent(field))
 
-def main():
-    if len(sys.argv) != 2:
-        print('Usage Error: ./lab3b fileName', file=sys.stderr)
-        sys.exit(1)
+	inode_num_list = get_allocated_inode_nums(inode_list) #get inode numbers of allocated inodes from list -> helps with inode_allocation_audit
+	block_consistency_audit(super_block, group, list_free_blocks, inode_list, list_indirect)
+	inode_allocation_audit(inode_list, list_free_inodes, super_block, inode_num_list)
+	directory_consistency_audit(list_dirent, super_block, inode_num_list, inode_list)
 
-    read_csv(sys.argv[1])
-    if isConsistent:
-        sys.exit(0)
-    else:
-        sys.exit(2)
+if isConsistent:
+	sys.exit(0)
+else:
+	sys.exit(2)
 
-if __name__ == '__main__':
-    main()
+

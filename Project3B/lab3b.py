@@ -12,10 +12,10 @@ inode_dict_reflc = dict()
 inode_dict_lr = dict()
 inode_dict_parents = dict()
 ref_inode = dict()
-bfree = set()
-ifree = set()
+bfree = list()
+ifree = list()
 
-reserved_blocks = set([0, 1, 2, 3, 4, 5, 6, 7, 64])
+reserved_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 64]
 
 total_blocks = 0
 total_inodes = 0
@@ -44,11 +44,11 @@ for i in lines:
 
 
 	elif summary_type == 'BFREE': # put in free blocks list
-		bfree.add(int(entry[1])) 
+		bfree.append(int(entry[1])) 
 
 
 	elif summary_type == 'IFREE': # put in free inodes list
-		ifree.add(int(entry[1])) 
+		ifree.append(int(entry[1])) 
 
 
 	elif summary_type == 'INODE':

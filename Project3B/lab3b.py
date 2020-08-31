@@ -201,20 +201,20 @@ def inodeDirCheck(file):
  
 def main():
 	if len(sys.argv) != 2:
-		sys.stderr.write("must provide one argument: name of csv file" + '\n')
+		sys.stderr.write("Must provide filename : ./lab3b fiilename\n")
 		exit(1)
 
 	try:
-		infile = open(sys.argv[1])
+		input_file = open(sys.argv[1], "r")
 	except IOError:
-		sys.stderr.write("Error. Cannot open file" + '\n')
+		sys.stderr.write("File cannot be opened\n")
 		exit(1)
 
 	exitcode = 0;
-	blockData(infile)
-	inodeDirCheck(infile)
+	blockData(input_file)
+	inodeDirCheck(input_file)
 
-	infile.close()
+	input_file.close()
 	if damaged:
 		exit(2)
 	else :

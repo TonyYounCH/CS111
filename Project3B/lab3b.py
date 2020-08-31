@@ -195,7 +195,8 @@ def inodeDirCheck(file):
 			if fields[6] == "'..'":
 				if int(fields[3]) != parentInode[int(fields[1])]:
 					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + str(parentInode[int(fields[1])]) + '\n')
-					damaged = True
+					damaged = True                 
+	return damaged
 
 
  
@@ -207,18 +208,16 @@ def main():
 	try:
 		input_file = open(sys.argv[1], "r")
 	except:
-		sys.stderr.write("Error. Cannot open file" + '\n')
+		sys.stderr.write('file does not exist\n')
 		exit(1)
 
 	exitcode = 0;
-	blockData(input_file)
-	inodeDirCheck(input_file)
+	if blockData(input_file):
+		exitcode = 2
+	if inodeDirCheck(input_file):
+		exitcode = 2
 	input_file.close()
-
-	if damaged:
-		exit(2)
-	else:
-		exit(0)
+	exit(exitcode)
 
 if __name__ == '__main__':
 	main()

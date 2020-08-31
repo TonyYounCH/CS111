@@ -11,9 +11,8 @@ import sys
 blocks = defaultdict(list)
 damaged = False
 
-def blockData(file):
-	file.seek(0)
-	for line in file:
+def blockData(lines):
+	for line in lines:
 		fields = line.split(',')
 		if fields[0] == 'SUPERBLOCK':
 			inode_size = int(fields[4])
@@ -128,13 +127,12 @@ def blockData(file):
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-def inodeDirCheck(file):
+def inodeDirCheck(lines):
 	freenodes = Set()
 	linkCounts = dict()
-	file.seek(0)
 	parentInode = dict()
 	#Collect the raw data
-	for rawline in file:
+	for rawline in lines:
 		line = rawline.rstrip('\r\n')
 		fields = line.split(',') 
 		if fields[0] == 'IFREE':
@@ -151,8 +149,7 @@ def inodeDirCheck(file):
 			if inodeNum not in parentInode:
 				parentInode[inodeNum] = int(fields[1])
 	allocnodes = Set()
-	file.seek(0)
-	for line in file:
+	for line in lines:
 		fields = line.split(',')
 		#Check which nodes are allocated and if linkage numbers are correct
 		if fields[0] == 'INODE':
@@ -173,8 +170,8 @@ def inodeDirCheck(file):
 		if x not in freenodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
-	file.seek(0)
-	for rawline in file:
+			
+	for rawline in lines:
 		line = rawline.rstrip('\r\n')
 		fields = line.split(',')
 		#Check that directory information is correct, including unallocated, invalid inodes, . , and .. files
@@ -211,10 +208,10 @@ def main():
 		exit(1)
 
 	exitcode = 0;
-	blockData(input_file)
-	inodeDirCheck(input_file)
+	lines = input_file.readlines()
+	blockData(lines)
+	inodeDirCheck(lines)
 
-	input_file.close()
 	if damaged:
 		exit(2)
 	else :

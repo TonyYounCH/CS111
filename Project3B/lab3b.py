@@ -132,8 +132,7 @@ def inodeDirCheck(lines):
 	linkCounts = dict()
 	parentInode = dict()
 	#Collect the raw data
-	for rawline in lines:
-		line = rawline.rstrip('\r\n')
+	for line in lines:
 		fields = line.split(',') 
 		if fields[0] == 'IFREE':
 			freenodes.add(int(fields[1]))
@@ -170,9 +169,8 @@ def inodeDirCheck(lines):
 		if x not in freenodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
-			
-	for rawline in lines:
-		line = rawline.rstrip('\r\n')
+
+	for line in lines:
 		fields = line.split(',')
 		#Check that directory information is correct, including unallocated, invalid inodes, . , and .. files
 		if fields[0] == 'DIRENT':

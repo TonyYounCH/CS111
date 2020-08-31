@@ -12,10 +12,10 @@ inode_dict_reflc = dict()
 inode_dict_lr = dict()
 inode_dict_parents = dict()
 ref_inode = dict()
-bfree = list()
-ifree = list()
+bfree = set()
+ifree = set()
 
-reserved_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 64]
+reserved_blocks = set([0, 1, 2, 3, 4, 5, 6, 7, 64])
 
 total_blocks = 0
 total_inodes = 0
@@ -24,6 +24,7 @@ linkcount = 0
 links = 0
 damaged = False
 
+# open the file from the command line argument
 try:
 	input_file = open(sys.argv[1], "r")
 except:
@@ -31,6 +32,7 @@ except:
 	exit(1)
 
 lines = input_file.readlines()
+# parse the input file
 for i in lines:
 	entry = i.split(",")
 	summary_type = entry[0]

@@ -1,298 +1,217 @@
+from collections import defaultdict
+from sets import Set
 import sys
-import csv
+
+#blocks looks like
+#{num, [['free'], ['INODE', inode#], ...]}
+blocks = defaultdict(list)
+def blockData(file):
+    correct = True
+    file.seek(0)
+    for line in file:
+        fields = line.split(',')
+        if fields[0] == 'SUPERBLOCK':
+            inode_size = int(fields[4])
+            block_size = int(fields[3])
+
+        if fields[0] == 'GROUP':
+            num_blocks = int(fields[2])
+            num_inodes = int(fields[3])
+            first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
+
+        if fields[0] == 'BFREE':
+            info = ['free']
+            blocks[int(fields[1])].append(info)
+
+        if fields[0] == 'INODE':
+            inode_num = int(fields[1])
+            for i in range(12, 27):
+                block_num = int(fields[i])
+                offset = i - 12
+                if i < 24:
+                    typ = ''
+                elif i == 24:
+                    typ = 'INDIRECT'
+                elif i == 25:
+                    typ = 'DOUBLE INDIRECT'
+                    offset = 12 + 256
+                elif i == 26:
+                    typ = 'TRIPLE INDIRECT'
+                    offset = 12 + 256 + 256*256
+
+                info = [typ, inode_num, offset] # a 2 element structure with {'type', inode #}
+                if block_num != 0:
+                    blocks[block_num].append(info)
+
+        if fields[0] == 'INDIRECT':
+            typ = ''
+            inode_num = fields[1]
+            block_num = int(fields[5])
+            offset = int(fields[3])
+            '''
+            if fields[2] == 1:
+                typ = 'INDIRECT'
+            if fields[2] == 2:
+                typ = 'DOUBLE INDIRECT'
+            if fields[2] == 3:
+                typ = 'TRIPLE INDIRECT'
+            '''
+            info = [typ, inode_num, offset]
+            blocks[block_num].append(info)
+
+################################################################################################
+#####   NOW PROCESS THE BLOCK DATA AND OUTPUT STUFF  ###########################################
+
+    #first figure out which are unreferenced
+    i = first_valid_block
+    for blocknum in blocks:
+        if i > blocknum:
+            continue
+        while i != blocknum and i < 64:
+            sys.stdout.write('UNREFERENCED BLOCK '+str(i)+'\n')
+            correct = False
+            i = i + 1
+        i = i + 1
+
+    #iterate over dict entries in blocks
+    for blocknum, lst in blocks.iteritems():
+        #print blocknum, lst, len(lst)
+        #check for allocated blocks on freelist and for duplicate references
+        if len(lst) > 1:
+            allocated_and_free = [0, 0]
+            num_references = 0
+            for item in lst:
+                if item[0] == 'free':
+                    allocated_and_free[0] = 1
+                if item[0] != 'free':
+                    allocated_and_free[1] = 1
+                    num_references = num_references + 1
+            if allocated_and_free[0] == 1 and allocated_and_free[1] == 1:
+                sys.stdout.write('ALLOCATED BLOCK '+str(blocknum)+' ON FREELIST'+'\n')
+                correct = False
+            if num_references > 1:
+                for item in lst: #yeah, I looped over it again... maybe there's a better way to do this
+                    if item[0] != 'free':
+                        typ = item[0]
+                        if typ != '':
+                            typ += ' '
+                        inum = item[1]
+                        offset = item[2]
+                        sys.stdout.write('DUPLICATE '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+                        correct = False
 
 
-class SuperBlock:
-    def __init__(self, nblocks, ninodes, bsize, isize, bgroup, igroup, finode):
-        self.num_blocks = nblocks
-        self.num_inodes = ninodes
-        self.block_size = bsize
-        self.inode_size = isize
-        self.blocks_per_group = bgroup
-        self.indoes_per_group = igroup
-        self.first_inode = finode
+            #sys.stdout.write('DUPLICATE')
 
+        #iterate over the lists in lst
+        for item in lst:
+            typ = item[0]
+            if typ != 'free':
+                inum = item[1]
+                offset =  item[2]
+            #check in bounds
+            if blocknum < 0 or blocknum > num_blocks:
+                if typ != '':
+                    typ += ' '
+                sys.stdout.write('INVALID '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+                correct = False
 
-class Group:
-    def __init__(self, gid, bingroup, iingroup, fbid, fiid, fbbn, fibn, fbinode):
-        self.group_id = gid
-        self.bid_group = bingroup
-        self.iid_group = iingroup
-        self.freeblock_id = fbid
-        self.freeinode_id = fiid
-        self.freeblock_bitmap_id = fbbn
-        self.freeinode_bitmap_id = fibn
-        self.first_block_inode = fbinode
+            #check reserved
+            if blocknum > 0 and blocknum < first_valid_block:
+                if typ != '':
+                    typ += ' '
+                sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+                correct = False
 
-
-class Inode:
-    def __init__(self, inumber, ftype, mode, owner, group, lcount, ctime, mtime, atime, fsize, dspace, baddress):
-        self.inode_number = inumber
-        self.file_type = ftype
-        self.mode = mode
-        self.owner = owner
-        self.group = group
-        self.linkage_counts = lcount
-        self.change_time = ctime
-        self.modify_time = mtime
-        self.access_time = atime
-        self.file_size = fsize
-        self.disk_space = dspace
-        self.block_address = baddress
-
-
-class DirectoryEntry:
-    def __init__(self, pinode, loffset, rinode, elength, nlength, name):
-        self.parent_inode = pinode
-        self.logical_offset = loffset
-        self.entry_reference_inode = rinode
-        self.entry_length = elength
-        self.entry_name_length = nlength
-        self.entry_name = name
-
-
-class Indirect:
-    def __init__(self, pinumber, level, loffset, bnumber, rnumber):
-        self.parent_inode_number = pinumber
-        self.level = level
-        self.logical_offset = loffset
-        self.block_number = bnumber
-        self.reference_number = rnumber
-
-
-def main():
-    # ================================================
-    # Initialization
-    # ================================================
-    my_bfree = []
-    my_ifree = []
-    my_inode = []
-    my_dir = []
-    my_indir = []
-    my_error = False
-
-    # ================================================
-    # Parsing Arguments
-    # ================================================
-    if len(sys.argv) != 2:
-        sys.stderr.write("Error: Unrecognized arguement")
-        sys.exit(1)
-
-    my_csv = open(sys.argv[1], 'r')
-    for lines in my_csv:
-        line_list = lines.split(",")
-        if line_list[0] == "SUPERBLOCK":
-            my_sp = SuperBlock(int(line_list[1]), int(line_list[2]), int(line_list[3]), int(line_list[4]),
-                               int(line_list[5]), int(line_list[6]), int(line_list[7]))
-        elif line_list[0] == "GROUP":
-            my_group = Group(int(line_list[1]), int(line_list[2]), int(line_list[3]), int(line_list[4]),
-                             int(line_list[5]), int(line_list[6]), int(line_list[7]), int(line_list[8]))
-        elif line_list[0] == "BFREE":
-            my_bfree.append(int(line_list[1]))
-        elif line_list[0] == "IFREE":
-            my_ifree.append(int(line_list[1]))
-        elif line_list[0] == "INODE":
-            my_inode.append(
-                Inode(int(line_list[1]), line_list[2], int(line_list[3]), int(line_list[4]), int(line_list[5]),
-                      int(line_list[6]), line_list[7], line_list[8], line_list[9], int(line_list[10]),
-                      int(line_list[11]), list(map(int, line_list[12:]))))
-        elif line_list[0] == "DIRENT":
-            my_dir.append(
-                DirectoryEntry(int(line_list[1]), int(line_list[2]), int(line_list[3]), int(line_list[4]),
-                               int(line_list[5]),
-                               line_list[6]))
-        elif line_list[0] == "INDIRECT":
-            my_indir.append(
-                Indirect(int(line_list[1]), int(line_list[2]), int(line_list[3]), int(line_list[4]), int(line_list[5])))
-        else:
-            sys.stderr.write("Error: Worry data content\n")
-            sys.exit(1)
-
-    # =======================================================
-    # Audit Block
-    # =======================================================
-    block_dic = {}
-    start_block = my_group.first_block_inode + int(my_sp.inode_size * my_group.iid_group / my_sp.block_size)
-    for cur_inode in my_inode:
-        if cur_inode.disk_space != 0 or cur_inode.file_type != 's':
-            for index, ele in enumerate(cur_inode.block_address):
-                if ele != 0:
-                    if index == 12:
-                        cur_level = "INDIRECT BLOCK"
-                        cur_offset = 12
-                    elif index == 13:
-                        cur_level = "DOUBLE INDIRECT BLOCK"
-                        cur_offset = 268
-                    elif index == 14:
-                        cur_level = "TRIPLE INDIRECT BLOCK"
-                        cur_offset = 65804
-                    else:
-                        cur_level = "BLOCK"
-                        cur_offset = 0
-
-                    if ele in my_bfree:
-                        my_error = True
-                        print('ALLOCATED BLOCK {} ON FREELIST'.format(ele))
-                    else:
-                        changed = False
-                        if ele < 0 or ele > my_sp.num_blocks:
-                            my_error = True
-                            changed = True
-                            print('INVALID {} {} IN INODE {} AT OFFSET {}'.format(cur_level, ele, cur_inode.inode_number,
-                                                                                cur_offset))
-                        if ele < start_block:
-                            my_error = True
-                            print('RESERVED {} {} IN INODE {} AT OFFSET {}'.format(cur_level, ele, cur_inode.inode_number,
-                                                                                cur_offset))
-                        elif not changed:
-                            if ele == 1886221359:
-                                print("my_inode, reserved")
-                            if ele in block_dic:
-                                block_dic[ele].append([cur_level, ele, cur_inode.inode_number, cur_offset])
-                            else:
-                                block_dic[ele] = [[cur_level, ele, cur_inode.inode_number, cur_offset]]
-
-    for cur_indir in my_indir:
-        if cur_indir.level == 1:
-            cur_level = "INDIRECT BLOCK"
-        elif cur_indir.level == 2:
-            cur_level = "DOUBLE INDIRECT BLOCK"
-        elif cur_indir.level == 3:
-            cur_level = "TRIPLE INDIRECT BLOCK"
-        else:
-            cur_level = "BLOCK"
-
-        if cur_indir.reference_number in my_bfree:
-            my_error = True
-            print('ALLOCATED BLOCK {} ON FREELIST'.format(cur_indir.reference_number))
-        else:
-            if cur_indir.reference_number < 0 or cur_indir.reference_number > my_sp.num_blocks:
-                my_error = True
-                print('INVALID {} {} IN INODE {} AT OFFSET {}'.format(cur_level, cur_indir.reference_number,
-                                                                      cur_indir.parent_inode_number,
-                                                                      cur_indir.logical_offset))
-            if cur_indir.reference_number < start_block:
-                my_error = True
-                print('RESERVED {} {} IN INODE {} AT OFFSET {}'.format(cur_level, cur_indir.reference_number,
-                                                                       cur_indir.parent_inode_number,
-                                                                       cur_indir.logical_offset))
-            if cur_indir.reference_number in block_dic:
-                if cur_indir.reference_number == 1886221359:
-                    print("my_dir, first")
-                block_dic[cur_indir.reference_number].append(
-                    [cur_level, cur_indir.reference_number, cur_indir.parent_inode_number, cur_indir.logical_offset])
+def inodeDirCheck(file):
+    correct = True
+    freenodes = Set()
+    linkCounts = dict()
+    file.seek(0)
+    parentInode = dict()
+    #Collect the raw data
+    for rawline in file:
+        line = rawline.rstrip('\r\n')
+        fields = line.split(',') 
+        if fields[0] == 'IFREE':
+            freenodes.add(int(fields[1]))
+        if fields[0] == 'SUPERBLOCK':
+            firstNode = int(fields[7])
+            numNodes = int(fields[2])
+        if fields[0] == 'DIRENT':
+            inodeNum = int(fields[3])
+            if inodeNum not in linkCounts:
+                linkCounts[inodeNum] = 1
             else:
-                if cur_indir.reference_number == 1886221359:
-                    print("my_dir, second")
-                block_dic[cur_indir.reference_number] = [
-                    [cur_level, cur_indir.reference_number, cur_indir.parent_inode_number, cur_indir.logical_offset]]
-
-    for _, value in block_dic.items():
-        #print(value)
-        if len(value) > 1:
-            for temp_block in value:
-                print('DUPLICATE {} {} IN INODE {} AT OFFSET {}'.format(temp_block[0], temp_block[1], temp_block[2],
-                                                                        temp_block[3]))
-
-    for temp_add in range(start_block, my_group.bid_group):
-        if temp_add not in my_bfree and temp_add not in block_dic:
-            my_error = True
-            print('UNREFERENCED BLOCK {}'.format(temp_add))
-
-    # =======================================================
-    # Audit Inode
-    # =======================================================
-    my_unallocated_inodes = my_ifree
-    my_allocated_inodes = []
-    #my_reserved = []
-
-    for inode in my_inode:
-        #print("Error 1 {}".format(inode.file_type))
-        if inode.file_type == '0':
-            #print("Error 2 {}".format(inode.inode_number))
-            #print("Error 3 {}".format(my_ifree))
-            if inode.inode_number not in my_ifree:
-                print("UNALLOCATED INODE {} NOT ON FREELIST".format(inode.inode_number))
-                my_error = True
-                my_unallocated_inodes.append(inode.inode_number)
-        else:
-            if inode.inode_number in my_ifree:
-                print("ALLOCATED INODE {} ON FREELIST".format(inode.inode_number))
-                my_error = True
-                my_unallocated_inodes.remove(inode.inode_number)
-            my_allocated_inodes.append(inode)
-
-    for i_pos in range(my_sp.first_inode, my_sp.num_inodes):
-        my_reserved = []
-        for inode in my_inode:
-            if inode.inode_number == i_pos:
-                my_reserved.append(inode)
-        if (len(my_reserved) <= 0) and (i_pos not in my_ifree):
-            # De Morgan Law changed, check if there is an error
-            print("UNALLOCATED INODE {} NOT ON FREELIST".format(i_pos))
-            my_error = True
-            my_unallocated_inodes.append(i_pos)
-
-    # =======================================================
-    # Audit Directory
-    # =======================================================
-    my_parent_inode = {2: 2}
-    my_dict_inode = {}
-
-    for directoryentry in my_dir:
-        inode_number = directoryentry.entry_reference_inode
-        if directoryentry.entry_name[:-1] != "'.'" and directoryentry.entry_name[:-1] != "'..'":
-            if 1 <= inode_number <= my_sp.num_inodes and (inode_number not in my_unallocated_inodes):
-                my_parent_inode[inode_number] = directoryentry.parent_inode
-    my_parent_inode[2] = 2
-
-    for directoryentry in my_dir:
-        inode_number = directoryentry.entry_reference_inode
-        directory_name = directoryentry.entry_name[:-1]
-        parent_inode_number = directoryentry.parent_inode
-        #print('ERROR MESSAGE: {} and {}'.format(inode_number, my_sp.num_inodes))
-        if inode_number in my_unallocated_inodes:
-            print('DIRECTORY INODE {} NAME {} UNALLOCATED INODE {}'.format(parent_inode_number, directory_name,
-                                                                           inode_number))
-            my_error = True
-        elif inode_number < 1 or inode_number > my_sp.num_inodes:
-            print(
-                'DIRECTORY INODE {} NAME {} INVALID INODE {}'.format(parent_inode_number, directory_name, inode_number))
-            my_error = True
-        else:
-            my_dict_inode[inode_number] = my_dict_inode.get(inode_number, 0) + 1
-
-        if directory_name == "'.'":
-            if inode_number != parent_inode_number:
-                print("DIRECTORY INODE {} NAME '.' LINK TO INODE {} SHOULD BE {}".format(parent_inode_number,
-                                                                                         inode_number,
-                                                                                         parent_inode_number))
-                my_error = True
-        if directory_name == "'..'":
-            if my_parent_inode[parent_inode_number] != inode_number:  # Check this !!!!!!!!!!!
-                print("DIRECTORY INODE {} NAME '..' LINK TO INODE {} SHOULD BE {}".format(parent_inode_number,
-                                                                                          inode_number,
-                                                                                          my_parent_inode[
-                                                                                              parent_inode_number]))
-
-    for inode in my_allocated_inodes:
-        if inode.inode_number not in my_dict_inode:
-            if inode.linkage_counts != 0:
-                my_error = True
-                print('INODE {} HAS 0 LINKS BUT LINKCOUNT IS {}'.format(inode.inode_number, inode.linkage_counts))
-        else:
-            temp_link_inode = inode.linkage_counts
-            temp_link_entry = my_dict_inode[inode.inode_number]
-            if temp_link_entry != temp_link_inode:
-                print('INODE {} HAS {} LINKS BUT LINKCOUNT IS {}'.format(inode.inode_number, temp_link_entry,
-                                                                         temp_link_inode))
-                my_error = True
-
-    # =======================================================
-    # Error Checking
-    # =======================================================
-    sys.exit(2) if my_error else sys.exit(0)
+                linkCounts[inodeNum] = linkCounts[inodeNum] + 1
+            if inodeNum not in parentInode:
+                parentInode[inodeNum] = int(fields[1])
+    allocnodes = Set()
+    file.seek(0)
+    for line in file:
+        fields = line.split(',')
+        #Check which nodes are allocated and if linkage numbers are correct
+        if fields[0] == 'INODE':
+            inodeNum = int(fields[1])
+            if inodeNum in freenodes:
+                sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
+                correct = False
+            allocnodes.add(inodeNum)
+            linkCnt = int(fields[6])
+            if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
+                sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
+                correct = False
+            elif inodeNum not in linkCounts:
+                sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
+                correct = False
+    #After we know which nodes are allocated, check for missing unallocated node entries
+    for x in range(firstNode,numNodes + 1):
+        if x not in freenodes and x not in allocnodes:
+            sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
+            correct = False
+    file.seek(0)
+    for rawline in file:
+        line = rawline.rstrip('\r\n')
+        fields = line.split(',')
+        #Check that directory information is correct, including unallocated, invalid inodes, . , and .. files
+        if fields[0] == 'DIRENT':
+            inodeNum = int(fields[3])
+            dirNum = int(fields[1])
+            if inodeNum not in allocnodes and inodeNum in range (1,numNodes + 1):
+                sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
+                correct = False
+            elif inodeNum < 1 or inodeNum > numNodes:
+                sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
+                correct = False
+            name = fields[6]
+            if fields[6] == "'.'":
+                if fields[3] != fields[1]:
+                    sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + fields[1] + '\n')
+                    correct = False
+            if fields[6] == "'..'":
+                if int(fields[3]) != parentInode[int(fields[1])]:
+                    sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + str(parentInode[int(fields[1])]) + '\n')
+                    correct = False                 
+    return correct
 
 
-if __name__ == "__main__":
+ 
+def main():
+    if len(sys.argv) != 2:
+        sys.stderr.write("must provide one argument: name of csv file" + '\n')
+        exit(1)
+    try:
+        infile = open(sys.argv[1])
+    except IOError:
+        sys.stderr.write("Error. Cannot open file" + '\n')
+        exit(1)
+    exitcode = 0;
+    if not blockData(infile):
+        exitcode = 2
+    if not inodeDirCheck(infile):
+        exitcode = 2
+    infile.close()
+    exit(exitcode)
+
+if __name__ == '__main__':
     main()

@@ -11,7 +11,48 @@ import sys
 blocks = defaultdict(list)
 damaged = False
 
-def blockData(blocks, first_valid_block, lines):
+def blockData(lines):
+	for line in lines:
+		fields = line.split(',')
+		if fields[0] == 'SUPERBLOCK':
+			block_size = int(fields[3])
+			inode_size = int(fields[4])
+
+		if fields[0] == 'GROUP':
+			num_blocks = int(fields[2])
+			num_inodes = int(fields[3])
+			first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
+
+		if fields[0] == 'BFREE':
+			blocks[int(fields[1])].append(['free'])
+
+		if fields[0] == 'INODE':
+			inode_num = int(fields[1])
+			for i in range(12, 27):
+				block_num = int(fields[i])
+				offset = i - 12
+				if i < 24:
+					typ = ''
+				elif i == 24:
+					typ = 'INDIRECT'
+				elif i == 25:
+					typ = 'DOUBLE INDIRECT'
+					offset = 12 + 256
+				elif i == 26:
+					typ = 'TRIPLE INDIRECT'
+					offset = 12 + 256 + 256*256
+
+				info = [typ, inode_num, offset] # a 2 element structure with {'type', inode #}
+				if block_num != 0:
+					blocks[block_num].append(info)
+
+		if fields[0] == 'INDIRECT':
+			typ = ''
+			inode_num = fields[1]
+			block_num = int(fields[5])
+			offset = int(fields[3])
+			info = [typ, inode_num, offset]
+			blocks[block_num].append(info)
 
 
 	i = first_valid_block
@@ -68,6 +109,49 @@ def blockData(blocks, first_valid_block, lines):
 				damaged = True
 
 def inodeDirCheck(lines):
+	freenodes = Set()
+	linkCounts = dict()
+	parentInode = dict()
+	#Collect the raw data
+	for rawline in lines:
+		line = rawline.rstrip('\r\n')
+		fields = line.split(',') 
+		if fields[0] == 'IFREE':
+			freenodes.add(int(fields[1]))
+		if fields[0] == 'SUPERBLOCK':
+			firstNode = int(fields[7])
+			numNodes = int(fields[2])
+		if fields[0] == 'DIRENT':
+			inodeNum = int(fields[3])
+			if inodeNum not in linkCounts:
+				linkCounts[inodeNum] = 1
+			else:
+				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
+			if inodeNum not in parentInode:
+				parentInode[inodeNum] = int(fields[1])
+	allocnodes = Set()
+	for line in lines:
+		fields = line.split(',')
+		#Check which nodes are allocated and if linkage numbers are correct
+		if fields[0] == 'INODE':
+			inodeNum = int(fields[1])
+			if inodeNum in freenodes:
+				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
+				damaged = True
+			allocnodes.add(inodeNum)
+			linkCnt = int(fields[6])
+			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
+				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
+				damaged = True
+			elif inodeNum not in linkCounts:
+				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
+				damaged = True
+	#After we know which nodes are allocated, check for missing unallocated node entries
+	for x in range(firstNode,numNodes + 1):
+		if x not in freenodes and x not in allocnodes:
+			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
+			damaged = True
+
 	for rawline in lines:
 		line = rawline.rstrip('\r\n')
 		fields = line.split(',')
@@ -91,100 +175,8 @@ def inodeDirCheck(lines):
 					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + str(parentInode[int(fields[1])]) + '\n')
 					damaged = True
 
-def process_csv(lines):
-	freenodes = Set()
-	linkCounts = dict()
-	parentInode = dict()
 
-	for line in lines:
-		fields = line.split(',')
-		if fields[0] == 'SUPERBLOCK':
-			block_size = int(fields[3])
-			inode_size = int(fields[4])
-
-		if fields[0] == 'GROUP':
-			num_blocks = int(fields[2])
-			num_inodes = int(fields[3])
-			first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
-
-		if fields[0] == 'BFREE':
-			blocks[int(fields[1])].append(['free'])
-
-		if fields[0] == 'INODE':
-			inode_num = int(fields[1])
-			for i in range(12, 27):
-				block_num = int(fields[i])
-				offset = i - 12
-				if i < 24:
-					typ = ''
-				elif i == 24:
-					typ = 'INDIRECT'
-				elif i == 25:
-					typ = 'DOUBLE INDIRECT'
-					offset = 12 + 256
-				elif i == 26:
-					typ = 'TRIPLE INDIRECT'
-					offset = 12 + 256 + 256*256
-
-				info = [typ, inode_num, offset] # a 2 element structure with {'type', inode #}
-				if block_num != 0:
-					blocks[block_num].append(info)
-
-		if fields[0] == 'INDIRECT':
-			typ = ''
-			inode_num = fields[1]
-			block_num = int(fields[5])
-			offset = int(fields[3])
-			info = [typ, inode_num, offset]
-			blocks[block_num].append(info)
- 	
- 	blockData(blocks, first_valid_block, lines)
-	
-	#Collect the raw data
-	for rawline in lines:
-		line = rawline.rstrip('\r\n')
-		fields = line.split(',') 
-		if fields[0] == 'IFREE':
-			freenodes.add(int(fields[1]))
-		if fields[0] == 'SUPERBLOCK':
-			firstNode = int(fields[7])
-			numNodes = int(fields[2])
-		if fields[0] == 'DIRENT':
-			inodeNum = int(fields[3])
-			if inodeNum not in linkCounts:
-				linkCounts[inodeNum] = 1
-			else:
-				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
-			if inodeNum not in parentInode:
-				parentInode[inodeNum] = int(fields[1])
-
-	allocnodes = Set()
-	for line in lines:
-		fields = line.split(',')
-		#Check which nodes are allocated and if linkage numbers are correct
-		if fields[0] == 'INODE':
-			inodeNum = int(fields[1])
-			if inodeNum in freenodes:
-				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
-				damaged = True
-			allocnodes.add(inodeNum)
-			linkCnt = int(fields[6])
-			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
-				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
-				damaged = True
-			elif inodeNum not in linkCounts:
-				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
-				damaged = True
-
-
-	#After we know which nodes are allocated, check for missing unallocated node entries
-	for x in range(firstNode,numNodes + 1):
-		if x not in freenodes and x not in allocnodes:
-			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
-			damaged = True
-
-	inodeDirCheck(lines)
-
+ 
 def main():
 	if len(sys.argv) != 2:
 		sys.stderr.write("Must provide filename : ./lab3b fiilename\n")
@@ -198,9 +190,8 @@ def main():
 
 	exitcode = 0;
 	lines = input_file.readlines()
-	# blockData(lines)
-	# inodeDirCheck(lines)
-	process_csv(lines)
+	blockData(lines)
+	inodeDirCheck(lines)
 
 	if damaged:
 		exit(2)

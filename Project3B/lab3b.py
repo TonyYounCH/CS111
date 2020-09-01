@@ -46,7 +46,7 @@ for i in lines:
     elif summary_type == 'GROUP':
         num_blocks = int(fields[2])
         num_inodes = int(fields[3])
-        first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
+        # first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
 
     elif summary_type == 'BFREE': # put in free blocks list
         bfree.add(int(field[1])) 

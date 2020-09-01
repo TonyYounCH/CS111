@@ -110,9 +110,11 @@ def blockData(super_block, group, blocks):
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-def inodeDirCheck(super_block, freenodes, list_dirent, lines):
+def inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines):
 	linkCounts = dict()
 	parentInode = dict()
+	allocnodes = Set()
+
 	for dirent in list_dirent:
 		if dirent.inode_num not in linkCounts:
 			linkCounts[dirent.inode_num] = 1
@@ -121,24 +123,19 @@ def inodeDirCheck(super_block, freenodes, list_dirent, lines):
 		if dirent.inode_num not in parentInode:
 			parentInode[dirent.inode_num] = dirent.parent_inode_num
 
+	for inode in inodes:
+		if inode.inode_num in freenodes:
+			sys.stdout.write('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST'+'\n')
+			damaged = True
+		allocnodes.add(inode.inode_num)
+		linkCnt = int(field[6])
+		if inode.inode_num in linkCounts and linkCounts[inode.inode_num] != inode.link_count:
+			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS ' + str(linkCounts[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
+			damaged = True
+		elif inode.inode_num not in linkCounts:
+			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
+			damaged = True
 
-	allocnodes = Set()
-	for line in lines:
-		field = line.split(',')
-		#Check which nodes are allocated and if linkage numbers are correct
-		if field[0] == 'INODE':
-			inodeNum = int(field[1])
-			if inodeNum in freenodes:
-				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
-				damaged = True
-			allocnodes.add(inodeNum)
-			linkCnt = int(field[6])
-			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
-				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
-				damaged = True
-			elif inodeNum not in linkCounts:
-				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
-				damaged = True
 	#After we know which nodes are allocated, check for missing unallocated node entries
 	for x in range(super_block.first_non_reserved_inode, super_block.total_inodes + 1):
 		if x not in freenodes and x not in allocnodes:
@@ -223,7 +220,7 @@ def process_csv(lines):
 			list_dirent.append(Dirent(field))
 
 	blockData(super_block, group, blocks)
-	inodeDirCheck(super_block, freenodes, list_dirent, lines)
+	inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines)
  
 def main():
 	if len(sys.argv) != 2:

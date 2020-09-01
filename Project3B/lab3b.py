@@ -128,7 +128,6 @@ def inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines):
 			sys.stdout.write('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST'+'\n')
 			damaged = True
 		allocnodes.add(inode.inode_num)
-		linkCnt = int(field[6])
 		if inode.inode_num in linkCounts and linkCounts[inode.inode_num] != inode.link_count:
 			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS ' + str(linkCounts[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
 			damaged = True

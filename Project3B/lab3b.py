@@ -198,8 +198,9 @@ def main():
 
 	exitcode = 0;
 	lines = input_file.readlines()
-	blockData(lines)
-	inodeDirCheck(lines)
+	# blockData(lines)
+	# inodeDirCheck(lines)
+	process_csv(lines)
 
 	if damaged:
 		exit(2)

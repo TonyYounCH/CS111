@@ -85,7 +85,7 @@ for i in lines:
             if block_num < 0 or block_num > total_blocks: # check validity
                 print('INVALID' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num) + ' AT OFFSET ' + str(offset))
                 damaged = True
-            elif block_num < first_valid_block and block_num != 0: # block is reserved
+            elif block_num in reserved_blocks and block_num != 0: # block is reserved
                 print('RESERVED' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num) + ' AT OFFSET ' + str(offset))
                 damaged = True
             elif block_num not in block_dict: # 1st reference to block
@@ -112,7 +112,7 @@ for i in lines:
         if block_num < 0 or block_num > total_blocks: # check validity
             print('INVALID ' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num) + ' AT OFFSET ' + str(offset))
             damaged = True
-        elif block_num < first_valid_block:
+        elif block_num in reserved_blocks:
             print('RESERVED ' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num)+ ' AT OFFSET ' + str(offset))
             damaged = True
         elif block_num not in block_dict: # 1st reference to block

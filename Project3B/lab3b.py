@@ -331,8 +331,10 @@ def process_csv(lines):
 		if field[0] == 'DIRENT':
 			directs.append(Direct(field))
 
-	blockData(lines)
-	inode_check(super_block, inodes, directs, freenodes)
+	super_block = blockData(lines)
+	inodeDirCheck(super_block, lines)
+	# blockData(lines)
+	# inode_check(super_block, inodes, directs, freenodes)
  
 def main():
 	if len(sys.argv) != 2:

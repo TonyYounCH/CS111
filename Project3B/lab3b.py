@@ -43,20 +43,20 @@ for i in lines:
         block_size = int(fields[3])
         inode_size = int(fields[4])
 
-    elif summary_type == 'GROUP':
+    if summary_type == 'GROUP':
         num_blocks = int(fields[2])
         num_inodes = int(fields[3])
         # first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
 
-    elif summary_type == 'BFREE': # put in free blocks list
+    if summary_type == 'BFREE': # put in free blocks list
         bfree.add(int(field[1])) 
 
 
-    elif summary_type == 'IFREE': # put in free inodes list
+    if summary_type == 'IFREE': # put in free inodes list
         ifree.add(int(field[1])) 
 
 
-    elif summary_type == 'INODE':
+    if summary_type == 'INODE':
         inode_num = int(field[1])
         # put in inode dict (link count) {inode number:link count}
         inode_dict_lc[inode_num] = int(field[6])
@@ -94,7 +94,7 @@ for i in lines:
                 block_dict[block_num].append([inode_num, offset, level])
 
 
-    elif summary_type == 'INDIRECT':
+    if summary_type == 'INDIRECT':
         block_num = int(field[5])
         inode_num = int(field[1])
 
@@ -121,7 +121,7 @@ for i in lines:
             block_dict[block_num].append([inode_num, offset, level])
 
 
-    elif summary_type == 'DIRENT': # put in inode dict (link ref)
+    if summary_type == 'DIRENT': # put in inode dict (link ref)
         dir_name = field[6]
         parent_inode = int(field[1])
         inode_num = int(field[3])

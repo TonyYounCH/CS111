@@ -41,7 +41,7 @@ class Dirent:
 		self.name_length = int(field[5])
 		self.name = str(field[6])
 
-def blockData(super_block, group, blocks, lines):
+def blockData(super_block, group, blocks):
 
 	first_valid_block = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
 	i = first_valid_block
@@ -97,27 +97,7 @@ def blockData(super_block, group, blocks, lines):
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-def inodeDirCheck(lines):
-	freenodes = Set()
-	linkCounts = dict()
-	parentInode = dict()
-	#Collect the raw data
-	for rawline in lines:
-		line = rawline.rstrip('\r\n')
-		field = line.split(',') 
-		if field[0] == 'IFREE':
-			freenodes.add(int(field[1]))
-		if field[0] == 'SUPERBLOCK':
-			firstNode = int(field[7])
-			numNodes = int(field[2])
-		if field[0] == 'DIRENT':
-			inodeNum = int(field[3])
-			if inodeNum not in linkCounts:
-				linkCounts[inodeNum] = 1
-			else:
-				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
-			if inodeNum not in parentInode:
-				parentInode[inodeNum] = int(field[1])
+def inodeDirCheck(super_block, freenodes, linkCounts, parentInode, lines):
 	allocnodes = Set()
 	for line in lines:
 		field = line.split(',')
@@ -136,7 +116,7 @@ def inodeDirCheck(lines):
 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
 				damaged = True
 	#After we know which nodes are allocated, check for missing unallocated node entries
-	for x in range(firstNode,numNodes + 1):
+	for x in range(super_block.first_non_reserved_inode, super_block.total_inodes + 1):
 		if x not in freenodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
@@ -148,10 +128,10 @@ def inodeDirCheck(lines):
 		if field[0] == 'DIRENT':
 			inodeNum = int(field[3])
 			dirNum = int(field[1])
-			if inodeNum not in allocnodes and inodeNum in range (1,numNodes + 1):
+			if inodeNum not in allocnodes and inodeNum in range (1,super_block.total_inodes + 1):
 				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
 				damaged = True
-			elif inodeNum < 1 or inodeNum > numNodes:
+			elif inodeNum < 1 or inodeNum > super_block.total_inodes:
 				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
 				damaged = True
 			name = field[6]
@@ -169,6 +149,10 @@ def process_csv(lines):
 	super_block = None
 	group = None
 
+	freenodes = Set()
+	linkCounts = dict()
+	parentInode = dict()
+
 	for line in lines:
 		field = line.split(',')
 		if field[0] == 'SUPERBLOCK':
@@ -176,10 +160,12 @@ def process_csv(lines):
 
 		if field[0] == 'GROUP':
 			group = Group(field)
-			
 
 		if field[0] == 'BFREE':
 			blocks[int(field[1])].append(['free'])
+
+		if field[0] == 'IFREE':
+			freenodes.add(int(field[1]))
 
 		if field[0] == 'INODE':
 			inode_num = int(field[1])
@@ -209,9 +195,17 @@ def process_csv(lines):
 			info = [typ, inode_num, offset]
 			blocks[block_num].append(info)
 
+		if field[0] == 'DIRENT':
+			inodeNum = int(field[3])
+			if inodeNum not in linkCounts:
+				linkCounts[inodeNum] = 1
+			else:
+				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
+			if inodeNum not in parentInode:
+				parentInode[inodeNum] = int(field[1])
 
-	blockData(super_block, group, blocks, lines)
-	inodeDirCheck(lines)
+	blockData(super_block, group, blocks)
+	inodeDirCheck(super_block, freenodes, linkCounts, parentInode, lines)
  
 def main():
 	if len(sys.argv) != 2:

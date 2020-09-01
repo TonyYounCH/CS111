@@ -65,6 +65,15 @@ def block_check(super_block, group, blocks):
 			i += 1
 
 	for block_num, infos in blocks.iteritems():
+		for info in infos:
+			if info[0] != 'BFREE':
+				if block_num < 0 or block_num > group.total_num_of_blocks:
+					print('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
+					damaged = True
+
+				if block_num > 0 and block_num < valid_block_start:
+					print('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
+					damaged = True
 		if len(infos) > 1:
 			free = False
 			notfree = False
@@ -83,15 +92,6 @@ def block_check(super_block, group, blocks):
 					if info[0] != 'BFREE':
 						print('DUPLICATE ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
 						damaged = True
-		for info in infos:
-			if info[0] != 'BFREE':
-				if block_num < 0 or block_num > group.total_num_of_blocks:
-					print('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
-					damaged = True
-
-				if block_num > 0 and block_num < valid_block_start:
-					print('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
-					damaged = True
 
 def inode_check(super_block, free_inodes, list_dirent, inodes):
 	link_count_dict = dict()

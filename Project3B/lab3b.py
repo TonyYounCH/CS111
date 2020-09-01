@@ -52,7 +52,7 @@ class Dirent:
 		self.inode_num = int(field[3])
 		self.entry_length = int(field[4])
 		self.name_length = int(field[5])
-		self.name = str(field[6])
+		self.name = str(field[6]).rstrip('\r\n')
 
 def blockData(super_block, group, blocks):
 

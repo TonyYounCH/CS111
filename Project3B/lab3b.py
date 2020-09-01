@@ -141,28 +141,21 @@ def inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines):
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
 
-	for rawline in lines:
-		line = rawline.rstrip('\r\n')
-		field = line.split(',')
-		#Check that directory information is correct, including unallocated, invalid inodes, . , and .. files
-		if field[0] == 'DIRENT':
-			inodeNum = int(field[3])
-			dirNum = int(field[1])
-			if inodeNum not in allocnodes and inodeNum in range (1,super_block.total_inodes + 1):
-				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
+	for dirent in list_dirent:
+		if dirent.inode_num not in allocnodes and dirent.inode_num in range (1,super_block.total_inodes + 1):
+			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' UNALLOCATED INODE ' + str(dirent.inode_num) + '\n')
+			damaged = True
+		elif dirent.inode_num < 1 or dirent.inode_num > super_block.total_inodes:
+			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' INVALID INODE ' + str(dirent.inode_num) + '\n')
+			damaged = True
+		if dirent.name == "'.'":
+			if dirent.inode_num != dirent.parent_inode_num:
+				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + dirent.parent_inode_num + '\n')
 				damaged = True
-			elif inodeNum < 1 or inodeNum > super_block.total_inodes:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
+		if dirent.name == "'..'":
+			if dirent.inode_num != parentInode[dirent.parent_inode_num]:
+				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + str(parentInode[dirent.parent_inode_num]) + '\n')
 				damaged = True
-			name = field[6]
-			if field[6] == "'.'":
-				if field[3] != field[1]:
-					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' LINK TO INODE ' + field[3] + ' SHOULD BE ' + field[1] + '\n')
-					damaged = True
-			if field[6] == "'..'":
-				if int(field[3]) != parentInode[int(field[1])]:
-					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' LINK TO INODE ' + field[3] + ' SHOULD BE ' + str(parentInode[int(field[1])]) + '\n')
-					damaged = True
 
 def process_csv(lines):
 	blocks = defaultdict(list)

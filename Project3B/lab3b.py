@@ -11,8 +11,8 @@ damaged = False
 
 class SuperBlock:
 	def __init__(self, field):
-		self.total_blocks = int(field[1])
-		self.total_inodes = int(field[2])
+		self.num_blocks = int(field[1])
+		self.num_inodes = int(field[2])
 		self.block_size = int(field[3])
 		self.inode_size = int(field[4])
 		self.blocks_per_group = int(field[5])
@@ -26,8 +26,8 @@ class Group:
 		self.total_num_of_inodes = int(field[3])
 		self.num_free_blocks = int(field[4])
 		self.num_free_inodes = int(field[5])
-		self.bitmap = int(field[6])
-		self.imap = int(field[7])
+		self.block_bitmap = int(field[6])
+		self.inode_bitmap = int(field[7])
 		self.first_block = int(field[8])
 
 class Inode:
@@ -35,24 +35,24 @@ class Inode:
         self.inode_num = int(field[1])
         self.file_type = (field[2])
         self.mode = field[3]
-        self.owner = int(field[4])
-        self.group = int(field[5])
+        self.uid = int(field[4])
+        self.gid = int(field[5])
         self.link_count = int(field[6])
-        self.change_time = field[7]
-        self.mod_time = field[8]
-        self.access_time = field[9]
+        self.ctime = field[7]
+        self.mtime = field[8]
+        self.atime = field[9]
         self.file_size = int(field[10])
         self.block_num = int(field[11])
 
 class Dirent:
 	def __init__(self, field):
 		self.parent_inode_num = int(field[1])
-		self.offset = int(field[2])
+		self.logical_byte = int(field[2])
 		self.inode_num = int(field[3])
 		self.entry_length = int(field[4])
 		self.name_length = int(field[5])
 		self.name = str(field[6]).rstrip('\r\n')
-
+		
 def blockData(super_block, group, blocks):
 	first_valid_block = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
 	i = first_valid_block
@@ -126,16 +126,16 @@ def inodeDirCheck(super_block, free_nodes, list_dirent, inodes):
 			damaged = True
 
 	#After we know which nodes are allocated, check for missing unallocated node entries
-	for x in range(super_block.first_non_reserved_inode, super_block.total_inodes + 1):
+	for x in range(super_block.first_non_reserved_inode, super_block.num_inodes + 1):
 		if x not in free_nodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
 
 	for dirent in list_dirent:
-		if dirent.inode_num not in allocnodes and dirent.inode_num in range (1,super_block.total_inodes + 1):
+		if dirent.inode_num not in allocnodes and dirent.inode_num in range (1,super_block.num_inodes + 1):
 			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' UNALLOCATED INODE ' + str(dirent.inode_num) + '\n')
 			damaged = True
-		elif dirent.inode_num < 1 or dirent.inode_num > super_block.total_inodes:
+		elif dirent.inode_num < 1 or dirent.inode_num > super_block.num_inodes:
 			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' INVALID INODE ' + str(dirent.inode_num) + '\n')
 			damaged = True
 		if dirent.name == "'.'":

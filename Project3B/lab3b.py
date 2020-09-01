@@ -62,7 +62,6 @@ def block_check(super_block, group, blocks):
 				sys.stdout.write('UNREFERENCED BLOCK ' + str(i) + '\n')
 				damaged = True
 				i += 1
-			i += 1
 
 	for block_num, infos in blocks.iteritems():
 		if len(infos) > 1:

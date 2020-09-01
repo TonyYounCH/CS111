@@ -31,7 +31,7 @@ class Group:
 class Inode:
     def __init__(self, field):
         self.inode_num = int(field[1])
-        self.file_type = (field[2])
+        self.file_type = field[2]
         self.mode = field[3]
         self.uid = int(field[4])
         self.gid = int(field[5])
@@ -69,7 +69,6 @@ def block_check(super_block, group, blocks):
 				if block_num < 0 or block_num > group.total_num_of_blocks:
 					print('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
 					damaged = True
-
 				if block_num > 0 and block_num < valid_block_start:
 					print('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
 					damaged = True
@@ -149,6 +148,7 @@ def process_csv(lines):
 	list_dirent = list()
 	free_inodes = list()
 
+	# First, process csv and save data into classes or lists
 	for line in lines:
 		field = line.split(',')
 		if field[0] == 'SUPERBLOCK':

@@ -31,6 +31,19 @@ class Group:
 		self.imap = int(field[7])
 		self.first_block = int(field[8])
 
+class Inode:
+    def __init__(self, field):
+        self.inode_num = int(field[1])
+        self.file_type = (field[2])
+        self.mode = field[3]
+        self.owner = int(field[4])
+        self.group = int(field[5])
+        self.link_count = int(field[6])
+        self.change_time = field[7]
+        self.mod_time = field[8]
+        self.access_time = field[9]
+        self.file_size = int(field[10])
+        self.block_num = int(field[11])
 
 class Dirent:
 	def __init__(self, field):
@@ -97,7 +110,18 @@ def blockData(super_block, group, blocks):
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-def inodeDirCheck(super_block, freenodes, linkCounts, parentInode, lines):
+def inodeDirCheck(super_block, freenodes, list_dirent, lines):
+	linkCounts = dict()
+	parentInode = dict()
+	for dirent in list_dirent:
+		if dirent.inode_num not in linkCounts:
+			linkCounts[dirent.inode_num] = 1
+		else:
+			linkCounts[dirent.inode_num] = linkCounts[dirent.inode_num] + 1
+		if dirent.inode_num not in parentInode:
+			parentInode[dirent.inode_num] = dirent.parent_inode_num
+
+
 	allocnodes = Set()
 	for line in lines:
 		field = line.split(',')
@@ -148,10 +172,10 @@ def process_csv(lines):
 	blocks = defaultdict(list)
 	super_block = None
 	group = None
+	inodes = list()
+	list_dirent = list()
 
 	freenodes = Set()
-	linkCounts = dict()
-	parentInode = dict()
 
 	for line in lines:
 		field = line.split(',')
@@ -168,7 +192,7 @@ def process_csv(lines):
 			freenodes.add(int(field[1]))
 
 		if field[0] == 'INODE':
-			inode_num = int(field[1])
+			inodes.append(Inode(field))
 			for i in range(12, 27):
 				block_num = int(field[i])
 				offset = i - 12
@@ -183,7 +207,7 @@ def process_csv(lines):
 					typ = 'TRIPLE INDIRECT'
 					offset = 12 + 256 + 256*256
 
-				info = [typ, inode_num, offset]
+				info = [typ, int(field[1]), offset]
 				if block_num != 0:
 					blocks[block_num].append(info)
 
@@ -196,16 +220,10 @@ def process_csv(lines):
 			blocks[block_num].append(info)
 
 		if field[0] == 'DIRENT':
-			inodeNum = int(field[3])
-			if inodeNum not in linkCounts:
-				linkCounts[inodeNum] = 1
-			else:
-				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
-			if inodeNum not in parentInode:
-				parentInode[inodeNum] = int(field[1])
+			list_dirent.append(Dirent(field))
 
 	blockData(super_block, group, blocks)
-	inodeDirCheck(super_block, freenodes, linkCounts, parentInode, lines)
+	inodeDirCheck(super_block, freenodes, list_dirent, lines)
  
 def main():
 	if len(sys.argv) != 2:

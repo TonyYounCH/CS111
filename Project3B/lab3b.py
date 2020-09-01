@@ -54,8 +54,8 @@ class Dirent:
 		self.name = str(field[6]).rstrip('\r\n')
 
 def block_check(super_block, group, blocks):
-	first_valid_block = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
-	i = first_valid_block
+	valid_block_start = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
+	i = valid_block_start
 	for block_num in blocks:
 		if i <= block_num:
 			while i != block_num and i < 64:
@@ -89,7 +89,7 @@ def block_check(super_block, group, blocks):
 					print('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
 					damaged = True
 
-				if block_num > 0 and block_num < first_valid_block:
+				if block_num > 0 and block_num < valid_block_start:
 					print('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
 					damaged = True
 
@@ -111,12 +111,11 @@ def inode_check(super_block, free_inodes, list_dirent, inodes):
 			print('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST')
 			damaged = True
 		inode_nums.append(inode.inode_num)
-		if inode.inode_num in link_count_dict:
-			links = link_count_dict[inode.inode_num]
-		else:
-			links = 0
-		if link_count_dict[inode.inode_num] != inode.link_count:
-			print('INODE ' + str(inode.inode_num) + ' HAS ' + str(links) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count))
+		if inode.inode_num in link_count_dict and link_count_dict[inode.inode_num] != inode.link_count:
+			print('INODE ' + str(inode.inode_num) + ' HAS ' + str(link_count_dict[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count))
+			damaged = True
+		elif inode.inode_num not in link_count_dict:
+			print('INODE ' + str(inode.inode_num) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(inode.link_count))
 			damaged = True
 
 	for inode in range(super_block.first_non_reserved_inode, super_block.num_inodes + 1):

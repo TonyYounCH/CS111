@@ -28,35 +28,29 @@ except:
 lines = input_file.readlines()
 # parse the input file
 for i in lines:
-    field = i.split(",")
-    summary_type = field[0]
+    entry = i.split(",")
+    summary_type = entry[0]
 
 
     if summary_type == 'SUPERBLOCK': # get basic information
-        total_blocks = int(field[1])
-        total_inodes = int(field[2])
-        block_size = int(fields[3])
-        inode_size = int(fields[4])
+        total_blocks = int(entry[1])
+        total_inodes = int(entry[2])
 
-    elif summary_type == 'GROUP':
-        num_blocks = int(fields[2])
-        num_inodes = int(fields[3])
-        first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
 
     elif summary_type == 'BFREE': # put in free blocks list
-        bfree.add(int(field[1])) 
+        bfree.add(int(entry[1])) 
 
 
     elif summary_type == 'IFREE': # put in free inodes list
-        ifree.add(int(field[1])) 
+        ifree.add(int(entry[1])) 
 
 
     elif summary_type == 'INODE':
-        inode_num = int(field[1])
+        inode_num = int(entry[1])
         # put in inode dict (link count) {inode number:link count}
-        inode_dict_lc[inode_num] = int(field[6])
+        inode_dict_lc[inode_num] = int(entry[6])
         for i in range(12, 27): # block addresses
-            block_num = int(field[i])
+            block_num = int(entry[i])
             if block_num == 0: # unused block address
                 continue
 
@@ -80,7 +74,7 @@ for i in lines:
             if block_num < 0 or block_num > total_blocks: # check validity
                 print('INVALID' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num) + ' AT OFFSET ' + str(offset))
                 damaged = True
-            elif block_num < first_valid_block and block_num != 0: # block is reserved
+            elif block_num in reserved_blocks and block_num != 0: # block is reserved
                 print('RESERVED' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num) + ' AT OFFSET ' + str(offset))
                 damaged = True
             elif block_num not in block_dict: # 1st reference to block
@@ -90,10 +84,10 @@ for i in lines:
 
 
     elif summary_type == 'INDIRECT':
-        block_num = int(field[5])
-        inode_num = int(field[1])
+        block_num = int(entry[5])
+        inode_num = int(entry[1])
 
-        level = int(field[2])
+        level = int(entry[2])
         if level == 1:
             strlvl = "INDIRECT"
             offset = 12
@@ -107,7 +101,7 @@ for i in lines:
         if block_num < 0 or block_num > total_blocks: # check validity
             print('INVALID ' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num) + ' AT OFFSET ' + str(offset))
             damaged = True
-        elif block_num < first_valid_block:
+        elif block_num in reserved_blocks:
             print('RESERVED ' + strlvl + ' BLOCK ' + str(block_num) + ' IN INODE ' + str(inode_num)+ ' AT OFFSET ' + str(offset))
             damaged = True
         elif block_num not in block_dict: # 1st reference to block
@@ -117,9 +111,9 @@ for i in lines:
 
 
     elif summary_type == 'DIRENT': # put in inode dict (link ref)
-        dir_name = field[6]
-        parent_inode = int(field[1])
-        inode_num = int(field[3])
+        dir_name = entry[6]
+        parent_inode = int(entry[1])
+        inode_num = int(entry[3])
 
         #print("adding" + str(inode_num))
         ref_inode[inode_num] = dir_name
@@ -150,7 +144,7 @@ for i in lines:
 
 # unreferenced blocks & allocated blocks on freelist 
 for x in range(1, total_blocks + 1):
-    if x not in bfree and x not in block_dict and x >= first_valid_block:
+    if x not in bfree and x not in block_dict and x not in reserved_blocks:
         print('UNREFERENCED BLOCK ' + str(x))
         damaged = True
     elif x in bfree and x in block_dict:

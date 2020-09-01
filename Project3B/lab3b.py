@@ -11,25 +11,56 @@ import sys
 blocks = defaultdict(list)
 damaged = False
 
+class SuperBlock:
+	def __init__(self, field):
+		self.total_blocks = int(field[1])
+		self.total_inodes = int(field[2])
+		self.block_size = int(field[3])
+		self.inode_size = int(field[4])
+		self.blocks_per_group = int(field[5])
+		self.inodes_per_group = int(field[6])
+		self.first_non_reserved_inode = int(field[7])
+
+class Group:
+	def __init__(self, field):
+		self.group_num = int(field[1])
+		self.total_num_of_blocks = int(field[2])
+		self.total_num_of_inodes = int(field[3])
+		self.num_free_blocks = int(field[4])
+		self.num_free_inodes = int(field[5])
+		self.bitmap = int(field[6])
+		self.imap = int(field[7])
+		self.first_block = int(field[8])
+
+
+class Dirent:
+	def __init__(self, field):
+		self.parent_inode_num = int(field[1])
+		self.offset = int(field[2])
+		self.inode_num = int(field[3])
+		self.entry_length = int(field[4])
+		self.name_length = int(field[5])
+		self.name = str(field[6])
+
 def blockData(lines):
 	for line in lines:
-		fields = line.split(',')
-		if fields[0] == 'SUPERBLOCK':
-			block_size = int(fields[3])
-			inode_size = int(fields[4])
+		field = line.split(',')
+		if field[0] == 'SUPERBLOCK':
+			block_size = int(field[3])
+			inode_size = int(field[4])
 
-		if fields[0] == 'GROUP':
-			num_blocks = int(fields[2])
-			num_inodes = int(fields[3])
-			first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
+		if field[0] == 'GROUP':
+			num_blocks = int(field[2])
+			num_inodes = int(field[3])
+			first_valid_block = int(field[8]) + inode_size * num_inodes / block_size
 
-		if fields[0] == 'BFREE':
-			blocks[int(fields[1])].append(['free'])
+		if field[0] == 'BFREE':
+			blocks[int(field[1])].append(['free'])
 
-		if fields[0] == 'INODE':
-			inode_num = int(fields[1])
+		if field[0] == 'INODE':
+			inode_num = int(field[1])
 			for i in range(12, 27):
-				block_num = int(fields[i])
+				block_num = int(field[i])
 				offset = i - 12
 				if i < 24:
 					typ = ''
@@ -42,15 +73,15 @@ def blockData(lines):
 					typ = 'TRIPLE INDIRECT'
 					offset = 12 + 256 + 256*256
 
-				info = [typ, inode_num, offset] # a 2 element structure with {'type', inode #}
+				info = [typ, inode_num, offset]
 				if block_num != 0:
 					blocks[block_num].append(info)
 
-		if fields[0] == 'INDIRECT':
+		if field[0] == 'INDIRECT':
 			typ = ''
-			inode_num = fields[1]
-			block_num = int(fields[5])
-			offset = int(fields[3])
+			inode_num = field[1]
+			block_num = int(field[5])
+			offset = int(field[3])
 			info = [typ, inode_num, offset]
 			blocks[block_num].append(info)
 
@@ -115,31 +146,31 @@ def inodeDirCheck(lines):
 	#Collect the raw data
 	for rawline in lines:
 		line = rawline.rstrip('\r\n')
-		fields = line.split(',') 
-		if fields[0] == 'IFREE':
-			freenodes.add(int(fields[1]))
-		if fields[0] == 'SUPERBLOCK':
-			firstNode = int(fields[7])
-			numNodes = int(fields[2])
-		if fields[0] == 'DIRENT':
-			inodeNum = int(fields[3])
+		field = line.split(',') 
+		if field[0] == 'IFREE':
+			freenodes.add(int(field[1]))
+		if field[0] == 'SUPERBLOCK':
+			firstNode = int(field[7])
+			numNodes = int(field[2])
+		if field[0] == 'DIRENT':
+			inodeNum = int(field[3])
 			if inodeNum not in linkCounts:
 				linkCounts[inodeNum] = 1
 			else:
 				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
 			if inodeNum not in parentInode:
-				parentInode[inodeNum] = int(fields[1])
+				parentInode[inodeNum] = int(field[1])
 	allocnodes = Set()
 	for line in lines:
-		fields = line.split(',')
+		field = line.split(',')
 		#Check which nodes are allocated and if linkage numbers are correct
-		if fields[0] == 'INODE':
-			inodeNum = int(fields[1])
+		if field[0] == 'INODE':
+			inodeNum = int(field[1])
 			if inodeNum in freenodes:
 				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
 				damaged = True
 			allocnodes.add(inodeNum)
-			linkCnt = int(fields[6])
+			linkCnt = int(field[6])
 			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
 				damaged = True
@@ -154,28 +185,30 @@ def inodeDirCheck(lines):
 
 	for rawline in lines:
 		line = rawline.rstrip('\r\n')
-		fields = line.split(',')
+		field = line.split(',')
 		#Check that directory information is correct, including unallocated, invalid inodes, . , and .. files
-		if fields[0] == 'DIRENT':
-			inodeNum = int(fields[3])
-			dirNum = int(fields[1])
+		if field[0] == 'DIRENT':
+			inodeNum = int(field[3])
+			dirNum = int(field[1])
 			if inodeNum not in allocnodes and inodeNum in range (1,numNodes + 1):
-				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
 				damaged = True
 			elif inodeNum < 1 or inodeNum > numNodes:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
 				damaged = True
-			name = fields[6]
-			if fields[6] == "'.'":
-				if fields[3] != fields[1]:
-					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + fields[1] + '\n')
+			name = field[6]
+			if field[6] == "'.'":
+				if field[3] != field[1]:
+					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' LINK TO INODE ' + field[3] + ' SHOULD BE ' + field[1] + '\n')
 					damaged = True
-			if fields[6] == "'..'":
-				if int(fields[3]) != parentInode[int(fields[1])]:
-					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + str(parentInode[int(fields[1])]) + '\n')
+			if field[6] == "'..'":
+				if int(field[3]) != parentInode[int(field[1])]:
+					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' LINK TO INODE ' + field[3] + ' SHOULD BE ' + str(parentInode[int(field[1])]) + '\n')
 					damaged = True
 
-
+def process_csv(lines):
+	blockData(lines)
+	inodeDirCheck(lines)
  
 def main():
 	if len(sys.argv) != 2:
@@ -190,8 +223,7 @@ def main():
 
 	exitcode = 0;
 	lines = input_file.readlines()
-	blockData(lines)
-	inodeDirCheck(lines)
+	process_csv(lines)
 
 	if damaged:
 		exit(2)

@@ -22,8 +22,8 @@ class SuperBlock:
 class Group:
     def __init__(self, field):
         self.group_num = int(field[1])
-        self.total_num_of_blocks = int(field[2])
-        self.total_num_of_inodes = int(field[3])
+        self.num_blocks = int(field[2])
+        self.num_inodes = int(field[3])
         self.num_free_blocks = int(field[4])
         self.num_free_inodes = int(field[5])
         self.bitmap = int(field[6])
@@ -91,14 +91,10 @@ def blockData(lines):
 		fields = line.split(',')
 		if fields[0] == 'SUPERBLOCK':
 			super_block = SuperBlock(fields)
-			block_size = int(fields[3])
-			inode_size = int(fields[4])
 
 		if fields[0] == 'GROUP':
 			group = Group(fields)
-			num_blocks = int(fields[2])
-			num_inodes = int(fields[3])
-			first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
+			first_valid_block = group.first_block + super_block.inode_size * group.num_inodes / super_block.block_size
 
 		if fields[0] == 'BFREE':
 			blocks[int(fields[1])].append(['free'])
@@ -118,7 +114,7 @@ def blockData(lines):
 					offset = 12 + 256
 				elif i == 26:
 					typ = 'TRIPLE INDIRECT'
-					offset = 12 + 256 + 256*256
+					offset = 12 + 256 + 256 * 256
 
 				info = [typ, inode_num, offset] # a 2 element structure with {'type', inode #}
 				if block_num != 0:
@@ -174,7 +170,7 @@ def blockData(lines):
 			if typ != 'free':
 				inum = item[1]
 				offset =  item[2]
-			if blocknum < 0 or blocknum > num_blocks:
+			if blocknum < 0 or blocknum > group.num_blocks:
 				if typ != '':
 					typ += ' '
 				sys.stdout.write('INVALID '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')

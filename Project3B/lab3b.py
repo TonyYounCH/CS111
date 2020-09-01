@@ -57,13 +57,12 @@ def block_check(super_block, group, blocks):
 	first_valid_block = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
 	i = first_valid_block
 	for block_num in blocks:
-		if i > block_num:
-			continue
-		while i != block_num and i < 64:
-			sys.stdout.write('UNREFERENCED BLOCK ' + str(i) + '\n')
-			damaged = True
+		if i <= block_num:
+			while i != block_num and i < 64:
+				sys.stdout.write('UNREFERENCED BLOCK ' + str(i) + '\n')
+				damaged = True
+				i += 1
 			i += 1
-		i += 1
 
 	for block_num, infos in blocks.iteritems():
 		if len(infos) > 1:

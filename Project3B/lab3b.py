@@ -157,7 +157,7 @@ def process_csv(lines):
 			group = Group(field)
 
 		if field[0] == 'BFREE':
-			blocks[int(field[1])].append(['free'])
+			blocks[int(field[1])].append(['free', None, None])
 
 		if field[0] == 'IFREE':
 			free_inodes.append(int(field[1]))
@@ -180,17 +180,12 @@ def process_csv(lines):
 					info.append('')
 				info.append(int(field[1]))
 				info.append(logical_offset)
-
 				if block_num != 0:
 					blocks[block_num].append(info)
 
 		if field[0] == 'INDIRECT':
-			typ = ''
-			inode_num = field[1]
-			block_num = int(field[5])
-			offset = int(field[3])
-			info = [typ, inode_num, offset]
-			blocks[block_num].append(info)
+			info = ['', field[1], int(field[3])]
+			blocks[int(field[5])].append(info)
 
 		if field[0] == 'DIRENT':
 			list_dirent.append(Dirent(field))

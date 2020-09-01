@@ -111,11 +111,12 @@ def inode_check(super_block, free_inodes, list_dirent, inodes):
 			print('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST')
 			damaged = True
 		inode_nums.append(inode.inode_num)
-		if inode.inode_num in link_count_dict and link_count_dict[inode.inode_num] != inode.link_count:
-			print('INODE ' + str(inode.inode_num) + ' HAS ' + str(link_count_dict[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count))
-			damaged = True
-		elif inode.inode_num not in link_count_dict:
-			print('INODE ' + str(inode.inode_num) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(inode.link_count))
+		if inode.inode_num in link_count_dict:
+			links = link_count_dict[inode.inode_num]
+		else:
+			links = 0
+		if link_count_dict[inode.inode_num] != inode.link_count:
+			print('INODE ' + str(inode.inode_num) + ' HAS ' + str(links) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count))
 			damaged = True
 
 	for inode in range(super_block.first_non_reserved_inode, super_block.num_inodes + 1):

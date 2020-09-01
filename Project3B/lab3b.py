@@ -180,8 +180,9 @@ def blockData(lines):
 					typ += ' '
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
+	return super_block
 
-def inodeDirCheck(lines):
+def inodeDirCheck(super_block, lines):
 	freenodes = Set()
 	linkCounts = dict()
 	parentInode = dict()
@@ -333,8 +334,8 @@ def main():
 
 	exitcode = 0;
 	lines = input_file.readlines()
-	blockData(lines)
-	inodeDirCheck(lines)
+	super_block = blockData(lines)
+	inodeDirCheck(super_block, lines)
 
 	if damaged:
 		exit(2)

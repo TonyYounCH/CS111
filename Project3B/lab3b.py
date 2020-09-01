@@ -31,19 +31,19 @@ class Group:
         self.first_block = int(field[8])
 
 class Inode:
-    def read_blocks(self, field):
-        list_blocks = []
-        if field[2] != 's':
-            for i in range(12, 24):
-                list_blocks.append(int(field[i]))
-        return list_blocks
-
-    def read_pointers(self, field):
-        list_pointers = []
-        if field[2] != 's':
-            for i in range(24, 27):
-                list_pointers.append(int(field[i]))
-        return list_pointers
+    def get_info(self, field):
+		for i in range(12, 27):
+			self.offset = i - 12
+			if i < 24:
+				self.typ = ''
+			elif i == 24:
+				self.typ = 'INDIRECT'
+			elif i == 25:
+				self.typ = 'DOUBLE INDIRECT'
+				self.offset = 12 + 256
+			elif i == 26:
+				self.typ = 'TRIPLE INDIRECT'
+				self.offset = 12 + 256 + 256 * 256
 
     def __init__(self, field):
         self.inode_num = int(field[1])
@@ -57,8 +57,7 @@ class Inode:
         self.access_time = field[9]
         self.file_size = int(field[10])
         self.block_num = int(field[11])
-        self.list_blocks = self.read_blocks(field)
-        self.list_pointers = self.read_pointers(field)
+        self.get_info(field)
 
 
 class Dirent:
@@ -81,29 +80,29 @@ class Indirect:
 
 blocks = defaultdict(list)
 damaged = False
+super_block = None
+group = None
 
 def blockData(lines):
-	super_block = None
-	group = None
 	inodes = list()
 
 	for line in lines:
-		fields = line.split(',')
-		if fields[0] == 'SUPERBLOCK':
-			super_block = SuperBlock(fields)
+		field = line.split(',')
+		if field[0] == 'SUPERBLOCK':
+			super_block = SuperBlock(field)
 
-		if fields[0] == 'GROUP':
-			group = Group(fields)
+		if field[0] == 'GROUP':
+			group = Group(field)
 			first_valid_block = group.first_block + super_block.inode_size * group.num_inodes / super_block.block_size
 
-		if fields[0] == 'BFREE':
-			blocks[int(fields[1])].append(['free'])
+		if field[0] == 'BFREE':
+			blocks[int(field[1])].append(['free'])
 
-		if fields[0] == 'INODE':
-			inodes.append(Inode(fields))
-			inode_num = int(fields[1])
+		if field[0] == 'INODE':
+			inodes.append(Inode(field))
+			inode_num = int(field[1])
 			for i in range(12, 27):
-				block_num = int(fields[i])
+				block_num = int(field[i])
 				offset = i - 12
 				if i < 24:
 					typ = ''
@@ -120,11 +119,11 @@ def blockData(lines):
 				if block_num != 0:
 					blocks[block_num].append(info)
 
-		if fields[0] == 'INDIRECT':
+		if field[0] == 'INDIRECT':
 			typ = ''
-			inode_num = fields[1]
-			block_num = int(fields[5])
-			offset = int(fields[3])
+			inode_num = field[1]
+			block_num = int(field[5])
+			offset = int(field[3])
 			info = [typ, inode_num, offset]
 			blocks[block_num].append(info)
 
@@ -189,31 +188,28 @@ def inodeDirCheck(lines):
 	#Collect the raw data
 	for rawline in lines:
 		line = rawline.rstrip('\r\n')
-		fields = line.split(',') 
-		if fields[0] == 'IFREE':
-			freenodes.add(int(fields[1]))
-		if fields[0] == 'SUPERBLOCK':
-			firstNode = int(fields[7])
-			numNodes = int(fields[2])
-		if fields[0] == 'DIRENT':
-			inodeNum = int(fields[3])
+		field = line.split(',') 
+		if field[0] == 'IFREE':
+			freenodes.add(int(field[1]))
+		if field[0] == 'DIRENT':
+			inodeNum = int(field[3])
 			if inodeNum not in linkCounts:
 				linkCounts[inodeNum] = 1
 			else:
 				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
 			if inodeNum not in parentInode:
-				parentInode[inodeNum] = int(fields[1])
+				parentInode[inodeNum] = int(field[1])
 	allocnodes = Set()
 	for line in lines:
-		fields = line.split(',')
+		field = line.split(',')
 		#Check which nodes are allocated and if linkage numbers are correct
-		if fields[0] == 'INODE':
-			inodeNum = int(fields[1])
+		if field[0] == 'INODE':
+			inodeNum = int(field[1])
 			if inodeNum in freenodes:
 				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
 				damaged = True
 			allocnodes.add(inodeNum)
-			linkCnt = int(fields[6])
+			linkCnt = int(field[6])
 			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
 				damaged = True
@@ -221,33 +217,106 @@ def inodeDirCheck(lines):
 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
 				damaged = True
 	#After we know which nodes are allocated, check for missing unallocated node entries
-	for x in range(firstNode,numNodes + 1):
+	for x in range(super_block.first_non_reserved_inode, super_block.total_inodes + 1):
 		if x not in freenodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
 
 	for rawline in lines:
 		line = rawline.rstrip('\r\n')
-		fields = line.split(',')
+		field = line.split(',')
 		#Check that directory information is correct, including unallocated, invalid inodes, . , and .. files
-		if fields[0] == 'DIRENT':
-			inodeNum = int(fields[3])
-			dirNum = int(fields[1])
+		if field[0] == 'DIRENT':
+			inodeNum = int(field[3])
+			dirNum = int(field[1])
 			if inodeNum not in allocnodes and inodeNum in range (1,numNodes + 1):
-				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
 				damaged = True
 			elif inodeNum < 1 or inodeNum > numNodes:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
 				damaged = True
-			name = fields[6]
-			if fields[6] == "'.'":
-				if fields[3] != fields[1]:
-					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + fields[1] + '\n')
+			name = field[6]
+			if field[6] == "'.'":
+				if field[3] != field[1]:
+					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' LINK TO INODE ' + field[3] + ' SHOULD BE ' + field[1] + '\n')
 					damaged = True
-			if fields[6] == "'..'":
-				if int(fields[3]) != parentInode[int(fields[1])]:
-					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + fields[6] + ' LINK TO INODE ' + fields[3] + ' SHOULD BE ' + str(parentInode[int(fields[1])]) + '\n')
+			if field[6] == "'..'":
+				if int(field[3]) != parentInode[int(field[1])]:
+					sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' LINK TO INODE ' + field[3] + ' SHOULD BE ' + str(parentInode[int(field[1])]) + '\n')
 					damaged = True
+
+# def process_csv(lines):
+# 	for line in lines:
+# 		field = line.split(',')
+# 		if field[0] == 'SUPERBLOCK':
+# 			super_block = SuperBlock(field)
+
+# 		if field[0] == 'GROUP':
+# 			group = Group(field)
+# 			first_valid_block = group.first_block + super_block.inode_size * group.num_inodes / super_block.block_size
+
+# 		if field[0] == 'BFREE':
+# 			blocks[int(field[1])].append(['free'])
+
+# 		if field[0] == 'INODE':
+# 			inodes.append(Inode(field))
+# 			inode_num = int(field[1])
+# 			for i in range(12, 27):
+# 				block_num = int(field[i])
+# 				offset = i - 12
+# 				if i < 24:
+# 					typ = ''
+# 				elif i == 24:
+# 					typ = 'INDIRECT'
+# 				elif i == 25:
+# 					typ = 'DOUBLE INDIRECT'
+# 					offset = 12 + 256
+# 				elif i == 26:
+# 					typ = 'TRIPLE INDIRECT'
+# 					offset = 12 + 256 + 256 * 256
+
+# 				info = [typ, inode_num, offset] # a 2 element structure with {'type', inode #}
+# 				if block_num != 0:
+# 					blocks[block_num].append(info)
+
+# 		if field[0] == 'INDIRECT':
+# 			typ = ''
+# 			inode_num = field[1]
+# 			block_num = int(field[5])
+# 			offset = int(field[3])
+# 			info = [typ, inode_num, offset]
+# 			blocks[block_num].append(info)
+
+# 	for rawline in lines:
+# 		line = rawline.rstrip('\r\n')
+# 		field = line.split(',') 
+# 		if field[0] == 'IFREE':
+# 			freenodes.add(int(field[1]))
+# 		if field[0] == 'DIRENT':
+# 			inodeNum = int(field[3])
+# 			if inodeNum not in linkCounts:
+# 				linkCounts[inodeNum] = 1
+# 			else:
+# 				linkCounts[inodeNum] = linkCounts[inodeNum] + 1
+# 			if inodeNum not in parentInode:
+# 				parentInode[inodeNum] = int(field[1])
+# 	allocnodes = Set()
+# 	for line in lines:
+# 		field = line.split(',')
+# 		#Check which nodes are allocated and if linkage numbers are correct
+# 		if field[0] == 'INODE':
+# 			inodeNum = int(field[1])
+# 			if inodeNum in freenodes:
+# 				sys.stdout.write('ALLOCATED INODE ' + str(inodeNum) + ' ON FREELIST'+'\n')
+# 				damaged = True
+# 			allocnodes.add(inodeNum)
+# 			linkCnt = int(field[6])
+# 			if inodeNum in linkCounts and linkCounts[inodeNum] != linkCnt:
+# 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS ' + str(linkCounts[inodeNum]) + ' LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
+# 				damaged = True
+# 			elif inodeNum not in linkCounts:
+# 				sys.stdout.write('INODE ' + str(inodeNum) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(linkCnt) + '\n')
+# 				damaged = True
 
 
  

@@ -155,7 +155,7 @@ for i in lines:
 
 # unreferenced blocks & allocated blocks on freelist 
 for x in range(1, total_blocks + 1):
-    if x not in bfree and x not in block_dict and x >= first_valid_block:
+    if x not in bfree and x not in block_dict and x not in reserved_blocks:
         print('UNREFERENCED BLOCK ' + str(x))
         damaged = True
     elif x in bfree and x in block_dict:

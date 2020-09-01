@@ -110,7 +110,7 @@ def blockData(super_block, group, blocks):
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-def inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines):
+def inodeDirCheck(super_block, freenodes, list_dirent, inodes):
 	linkCounts = dict()
 	parentInode = dict()
 	allocnodes = Set()
@@ -150,11 +150,11 @@ def inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines):
 			damaged = True
 		if dirent.name == "'.'":
 			if dirent.inode_num != dirent.parent_inode_num:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + dirent.parent_inode_num + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(dirent.parent_inode_num) + '\n')
 				damaged = True
 		if dirent.name == "'..'":
 			if dirent.inode_num != parentInode[dirent.parent_inode_num]:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + str(parentInode[dirent.parent_inode_num]) + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(parentInode[dirent.parent_inode_num]) + '\n')
 				damaged = True
 
 def process_csv(lines):
@@ -212,7 +212,7 @@ def process_csv(lines):
 			list_dirent.append(Dirent(field))
 
 	blockData(super_block, group, blocks)
-	inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines)
+	inodeDirCheck(super_block, freenodes, list_dirent, inodes)
  
 def main():
 	if len(sys.argv) != 2:

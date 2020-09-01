@@ -33,29 +33,35 @@ except:
 lines = input_file.readlines()
 # parse the input file
 for i in lines:
-    entry = i.split(",")
-    summary_type = entry[0]
+    field = i.split(",")
+    summary_type = field[0]
 
 
     if summary_type == 'SUPERBLOCK': # get basic information
-        total_blocks = int(entry[1])
-        total_inodes = int(entry[2])
+        total_blocks = int(field[1])
+        total_inodes = int(field[2])
+        block_size = int(fields[3])
+        inode_size = int(fields[4])
 
+    elif summary_type == 'GROUP':
+        num_blocks = int(fields[2])
+        num_inodes = int(fields[3])
+        first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
 
     elif summary_type == 'BFREE': # put in free blocks list
-        bfree.add(int(entry[1])) 
+        bfree.add(int(field[1])) 
 
 
     elif summary_type == 'IFREE': # put in free inodes list
-        ifree.add(int(entry[1])) 
+        ifree.add(int(field[1])) 
 
 
     elif summary_type == 'INODE':
-        inode_num = int(entry[1])
+        inode_num = int(field[1])
         # put in inode dict (link count) {inode number:link count}
-        inode_dict_lc[inode_num] = int(entry[6])
+        inode_dict_lc[inode_num] = int(field[6])
         for i in range(12, 27): # block addresses
-            block_num = int(entry[i])
+            block_num = int(field[i])
             if block_num == 0: # unused block address
                 continue
 
@@ -89,10 +95,10 @@ for i in lines:
 
 
     elif summary_type == 'INDIRECT':
-        block_num = int(entry[5])
-        inode_num = int(entry[1])
+        block_num = int(field[5])
+        inode_num = int(field[1])
 
-        level = int(entry[2])
+        level = int(field[2])
         if level == 1:
             strlvl = "INDIRECT"
             offset = 12
@@ -116,9 +122,9 @@ for i in lines:
 
 
     elif summary_type == 'DIRENT': # put in inode dict (link ref)
-        dir_name = entry[6]
-        parent_inode = int(entry[1])
-        inode_num = int(entry[3])
+        dir_name = field[6]
+        parent_inode = int(field[1])
+        inode_num = int(field[3])
 
         #print("adding" + str(inode_num))
         ref_inode[inode_num] = dir_name

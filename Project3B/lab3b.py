@@ -317,35 +317,33 @@ def process_csv(lines):
 	linkCounts = dict()
 	parentInode = dict()
 
-	# for line in lines:
-	# 	field = line.split(',')
-	# 	if field[0] == 'SUPERBLOCK':
-	# 		super_block = SuperBlock(field)
+	for line in lines:
+		field = line.split(',')
+		if field[0] == 'SUPERBLOCK':
+			super_block = SuperBlock(field)
 
-	# 	if field[0] == 'GROUP':
-	# 		group = Group(field)
+		if field[0] == 'GROUP':
+			group = Group(field)
 
-	# 	if field[0] == 'BFREE':
-	# 		blocks[int(field[1])].append(['free'])
+		if field[0] == 'BFREE':
+			blocks[int(field[1])].append(['free'])
 
-	# 	if field[0] == 'INODE':
-	# 		inodes.append(Inode(field))
+		if field[0] == 'INODE':
+			inodes.append(Inode(field))
 
-	# 	if field[0] == 'INDIRECT':
-	# 		indirect.append(Indirect(field))
+		if field[0] == 'INDIRECT':
+			indirect.append(Indirect(field))
 
-	# for rawline in lines:
-	# 	line = rawline.rstrip('\r\n')
-	# 	field = line.split(',') 
-	# 	if field[0] == 'IFREE':
-	# 		freenodes.add(int(field[1]))
-	# 	if field[0] == 'DIRENT':
-	# 		directs.append(Direct(field))
+	for rawline in lines:
+		line = rawline.rstrip('\r\n')
+		field = line.split(',') 
+		if field[0] == 'IFREE':
+			freenodes.add(int(field[1]))
+		if field[0] == 'DIRENT':
+			directs.append(Direct(field))
 
-	super_block = blockData(lines)
-	inodeDirCheck(super_block, lines)
-	# blockData(lines)
-	# inode_check(super_block, inodes, directs, freenodes)
+	blockData(lines)
+	inode_check(super_block, inodes, directs, freenodes)
  
 def main():
 	if len(sys.argv) != 2:

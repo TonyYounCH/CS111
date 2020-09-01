@@ -5,7 +5,6 @@
 #ID: 304207830
 
 from collections import defaultdict
-from sets import Set
 import sys
 
 damaged = False
@@ -84,8 +83,6 @@ def blockData(super_block, group, blocks):
 				for item in lst:
 					if item[0] != 'free':
 						typ = item[0]
-						if typ != '':
-							typ += ' '
 						inum = item[1]
 						offset = item[2]
 						sys.stdout.write('DUPLICATE '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
@@ -96,21 +93,17 @@ def blockData(super_block, group, blocks):
 				inum = item[1]
 				offset =  item[2]
 			if blocknum < 0 or blocknum > group.total_num_of_blocks:
-				if typ != '':
-					typ += ' '
 				sys.stdout.write('INVALID '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
 			if blocknum > 0 and blocknum < first_valid_block:
-				if typ != '':
-					typ += ' '
 				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
 def inodeDirCheck(super_block, free_nodes, list_dirent, inodes):
 	linkCounts = dict()
 	parentInode = dict()
-	allocnodes = Set()
+	allocnodes = list()
 
 	for dirent in list_dirent:
 		if dirent.inode_num not in linkCounts:
@@ -124,7 +117,7 @@ def inodeDirCheck(super_block, free_nodes, list_dirent, inodes):
 		if inode.inode_num in free_nodes:
 			sys.stdout.write('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST'+'\n')
 			damaged = True
-		allocnodes.add(inode.inode_num)
+		allocnodes.append(inode.inode_num)
 		if inode.inode_num in linkCounts and linkCounts[inode.inode_num] != inode.link_count:
 			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS ' + str(linkCounts[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
 			damaged = True
@@ -160,7 +153,6 @@ def process_csv(lines):
 	group = None
 	inodes = list()
 	list_dirent = list()
-
 	free_nodes = list()
 
 	for line in lines:
@@ -182,20 +174,19 @@ def process_csv(lines):
 			for i in range(12, 27):
 				block_num = int(field[i])
 				offset = i - 12
-				if i < 24:
-					typ = ''
-				elif i == 24:
-					typ = 'INDIRECT'
+				if i == 24:
+					typ = 'INDIRECT '
 				elif i == 25:
-					typ = 'DOUBLE INDIRECT'
+					typ = 'DOUBLE INDIRECT '
 					offset = 12 + 256
 				elif i == 26:
-					typ = 'TRIPLE INDIRECT'
+					typ = 'TRIPLE INDIRECT '
 					offset = 12 + 256 + 256*256
+				else:
+					typ = ''
 
-				info = [typ, int(field[1]), offset]
 				if block_num != 0:
-					blocks[block_num].append(info)
+					blocks[block_num].append([typ, int(field[1]), offset])
 
 		if field[0] == 'INDIRECT':
 			typ = ''

@@ -59,9 +59,10 @@ def block_check(super_block, group, blocks):
 	for block_num in blocks:
 		if i <= block_num:
 			while i != block_num and i < 64:
-				sys.stdout.write('UNREFERENCED BLOCK ' + str(i) + '\n')
+				print('UNREFERENCED BLOCK ' + str(i) + '\n')
 				damaged = True
 				i += 1
+			i += 1
 
 	for block_num, infos in blocks.iteritems():
 		if len(infos) > 1:
@@ -69,73 +70,73 @@ def block_check(super_block, group, blocks):
 			notfree = False
 			count = 0
 			for info in infos:
-				if info[0] == 'free':
+				if info[0] == 'BFREE':
 					free = True
 				else:
 					notfree = True
 					count += 1
 			if free and notfree:
-				sys.stdout.write('ALLOCATED BLOCK ' + str(block_num) + ' ON FREELIST'+'\n')
+				print('ALLOCATED BLOCK ' + str(block_num) + ' ON FREELIST' + '\n')
 				damaged = True
 			if count > 1:
 				for info in infos:
-					if info[0] != 'free':
-						sys.stdout.write('DUPLICATE ' + info[0] +'BLOCK ' + str(block_num)+' IN INODE '+str(info[1])+' AT OFFSET '+str(info[2])+'\n')
+					if info[0] != 'BFREE':
+						print('DUPLICATE ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
 						damaged = True
 		for info in infos:
-			if info[0] != 'free':
+			if info[0] != 'BFREE':
 				if block_num < 0 or block_num > group.total_num_of_blocks:
-					sys.stdout.write('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
+					print('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
 					damaged = True
 
 				if block_num > 0 and block_num < first_valid_block:
-					sys.stdout.write('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
+					print('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
 					damaged = True
 
 def inode_check(super_block, free_inodes, list_dirent, inodes):
-	linkCounts = dict()
-	parentInode = dict()
-	allocnodes = list()
+	link_count_dict = dict()
+	parent_inode_dict = dict()
+	inode_nums = list()
 
 	for dirent in list_dirent:
-		if dirent.inode_num not in linkCounts:
-			linkCounts[dirent.inode_num] = 1
+		if dirent.inode_num not in link_count_dict:
+			link_count_dict[dirent.inode_num] = 1
 		else:
-			linkCounts[dirent.inode_num] = linkCounts[dirent.inode_num] + 1
-		if dirent.inode_num not in parentInode:
-			parentInode[dirent.inode_num] = dirent.parent_inode_num
+			link_count_dict[dirent.inode_num] = link_count_dict[dirent.inode_num] + 1
+		if dirent.inode_num not in parent_inode_dict:
+			parent_inode_dict[dirent.inode_num] = dirent.parent_inode_num
 
 	for inode in inodes:
 		if inode.inode_num in free_inodes:
-			sys.stdout.write('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST'+'\n')
+			print('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST' + '\n')
 			damaged = True
-		allocnodes.append(inode.inode_num)
-		if inode.inode_num in linkCounts and linkCounts[inode.inode_num] != inode.link_count:
-			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS ' + str(linkCounts[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
+		inode_nums.append(inode.inode_num)
+		if inode.inode_num in link_count_dict and link_count_dict[inode.inode_num] != inode.link_count:
+			print('INODE ' + str(inode.inode_num) + ' HAS ' + str(link_count_dict[inode.inode_num]) + ' LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
 			damaged = True
-		elif inode.inode_num not in linkCounts:
-			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
+		elif inode.inode_num not in link_count_dict:
+			print('INODE ' + str(inode.inode_num) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
 			damaged = True
 
-	for x in range(super_block.first_non_reserved_inode, super_block.num_inodes + 1):
-		if x not in free_inodes and x not in allocnodes:
-			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
+	for inode in range(super_block.first_non_reserved_inode, super_block.num_inodes + 1):
+		if inode not in free_inodes and inode not in inode_nums:
+			print('UNALLOCATED INODE ' + str(inode) + ' NOT ON FREELIST' + '\n')
 			damaged = True
 
 	for dirent in list_dirent:
-		if dirent.inode_num not in allocnodes and dirent.inode_num in range (1,super_block.num_inodes + 1):
-			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' UNALLOCATED INODE ' + str(dirent.inode_num) + '\n')
+		if dirent.inode_num not in inode_nums and dirent.inode_num in range (1, super_block.num_inodes + 1):
+			print('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' UNALLOCATED INODE ' + str(dirent.inode_num) + '\n')
 			damaged = True
 		elif dirent.inode_num < 1 or dirent.inode_num > super_block.num_inodes:
-			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' INVALID INODE ' + str(dirent.inode_num) + '\n')
+			print('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' INVALID INODE ' + str(dirent.inode_num) + '\n')
 			damaged = True
 		if dirent.name == "'.'":
 			if dirent.inode_num != dirent.parent_inode_num:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(dirent.parent_inode_num) + '\n')
+				print('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(dirent.parent_inode_num) + '\n')
 				damaged = True
-		if dirent.name == "'..'":
-			if dirent.inode_num != parentInode[dirent.parent_inode_num]:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(parentInode[dirent.parent_inode_num]) + '\n')
+		elif dirent.name == "'..'":
+			if dirent.inode_num != parent_inode_dict[dirent.parent_inode_num]:
+				print('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(parent_inode_dict[dirent.parent_inode_num]) + '\n')
 				damaged = True
 
 def process_csv(lines):
@@ -155,7 +156,7 @@ def process_csv(lines):
 			group = Group(field)
 
 		if field[0] == 'BFREE':
-			blocks[int(field[1])].append(['free', None, None])
+			blocks[int(field[1])].append(['BFREE', None, None])
 
 		if field[0] == 'IFREE':
 			free_inodes.append(int(field[1]))
@@ -193,13 +194,13 @@ def process_csv(lines):
  
 def main():
 	if len(sys.argv) != 2:
-		sys.stderr.write("Must provide filename : ./lab3b fiilename\n")
+		sys.stderr.write("Error receiving filename : ./lab3b filename\n")
 		exit(1)
 
 	try:
 		input_file = open(sys.argv[1], "r")
-	except IOError:
-		sys.stderr.write("File cannot be opened\n")
+	except:
+		sys.stderr.write('Failed to open file.\n')
 		exit(1)
 
 	lines = input_file.readlines()

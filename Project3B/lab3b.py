@@ -55,14 +55,14 @@ class Dirent:
 
 def block_check(super_block, group, blocks):
 	valid_block_start = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
-	i = valid_block_start
+	curr = valid_block_start
 	for block_num in blocks:
-		if i <= block_num:
-			while i != block_num and i < 64:
-				print('UNREFERENCED BLOCK ' + str(i))
+		if curr <= block_num:
+			while curr != block_num and curr < 64:
+				print('UNREFERENCED BLOCK ' + str(curr))
 				damaged = True
-				i += 1
-			i += 1
+				curr += 1
+			curr += 1
 
 	for block_num, infos in blocks.iteritems():
 		for info in infos:
@@ -207,7 +207,7 @@ def main():
 	process_csv(lines)
 
 	if damaged:
-		exit(2)
+		exit(1)
 	else :
 		exit(0)
 

@@ -230,10 +230,10 @@ def inodeDirCheck(super_block, lines):
 		if field[0] == 'DIRENT':
 			inodeNum = int(field[3])
 			dirNum = int(field[1])
-			if inodeNum not in allocnodes and inodeNum in range (1,numNodes + 1):
+			if inodeNum not in allocnodes and inodeNum in range (1,super_block.total_inodes + 1):
 				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' UNALLOCATED INODE ' + str(inodeNum) + '\n')
 				damaged = True
-			elif inodeNum < 1 or inodeNum > numNodes:
+			elif inodeNum < 1 or inodeNum > super_block.total_inodes:
 				sys.stdout.write('DIRECTORY INODE ' + str(dirNum) + ' NAME ' + field[6] + ' INVALID INODE ' + str(inodeNum) + '\n')
 				damaged = True
 			name = field[6]

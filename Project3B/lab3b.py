@@ -81,6 +81,17 @@ class Indirect:
 
 damaged = False
 
+blocks = defaultdict(list)
+super_block = None
+group = None
+inodes = list()
+free_blocks = list()
+free_inodes = list()
+indirect = list()
+directs = list()
+freenodes = Set()
+linkCounts = dict()
+parentInode = dict()
 def blockData(lines):
 	inodes = list()
 

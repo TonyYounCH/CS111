@@ -143,18 +143,18 @@ def inodeDirCheck(super_block, freenodes, list_dirent, inodes, lines):
 
 	for dirent in list_dirent:
 		if dirent.inode_num not in allocnodes and dirent.inode_num in range (1,super_block.total_inodes + 1):
-			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' UNALLOCATED INODE ' + str(dirent.inode_num) + '\n')
+			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' UNALLOCATED INODE ' + str(dirent.inode_num) + '\n')
 			damaged = True
 		elif dirent.inode_num < 1 or dirent.inode_num > super_block.total_inodes:
-			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' INVALID INODE ' + str(dirent.inode_num) + '\n')
+			sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' INVALID INODE ' + str(dirent.inode_num) + '\n')
 			damaged = True
 		if dirent.name == "'.'":
 			if dirent.inode_num != dirent.parent_inode_num:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + dirent.parent_inode_num + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + dirent.parent_inode_num + '\n')
 				damaged = True
 		if dirent.name == "'..'":
 			if dirent.inode_num != parentInode[dirent.parent_inode_num]:
-				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + dirent.name + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + str(parentInode[dirent.parent_inode_num]) + '\n')
+				sys.stdout.write('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + dirent.inode_num + ' SHOULD BE ' + str(parentInode[dirent.parent_inode_num]) + '\n')
 				damaged = True
 
 def process_csv(lines):

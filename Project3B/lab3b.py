@@ -8,7 +8,6 @@ from collections import defaultdict
 from sets import Set
 import sys
 
-blocks = defaultdict(list)
 damaged = False
 
 class SuperBlock:
@@ -42,50 +41,9 @@ class Dirent:
 		self.name_length = int(field[5])
 		self.name = str(field[6])
 
-def blockData(lines):
-	for line in lines:
-		field = line.split(',')
-		if field[0] == 'SUPERBLOCK':
-			block_size = int(field[3])
-			inode_size = int(field[4])
+def blockData(super_block, group, blocks, lines):
 
-		if field[0] == 'GROUP':
-			num_blocks = int(field[2])
-			num_inodes = int(field[3])
-			first_valid_block = int(field[8]) + inode_size * num_inodes / block_size
-
-		if field[0] == 'BFREE':
-			blocks[int(field[1])].append(['free'])
-
-		if field[0] == 'INODE':
-			inode_num = int(field[1])
-			for i in range(12, 27):
-				block_num = int(field[i])
-				offset = i - 12
-				if i < 24:
-					typ = ''
-				elif i == 24:
-					typ = 'INDIRECT'
-				elif i == 25:
-					typ = 'DOUBLE INDIRECT'
-					offset = 12 + 256
-				elif i == 26:
-					typ = 'TRIPLE INDIRECT'
-					offset = 12 + 256 + 256*256
-
-				info = [typ, inode_num, offset]
-				if block_num != 0:
-					blocks[block_num].append(info)
-
-		if field[0] == 'INDIRECT':
-			typ = ''
-			inode_num = field[1]
-			block_num = int(field[5])
-			offset = int(field[3])
-			info = [typ, inode_num, offset]
-			blocks[block_num].append(info)
-
-
+	first_valid_block = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
 	i = first_valid_block
 	for blocknum in blocks:
 		if i > blocknum:
@@ -127,7 +85,7 @@ def blockData(lines):
 			if typ != 'free':
 				inum = item[1]
 				offset =  item[2]
-			if blocknum < 0 or blocknum > num_blocks:
+			if blocknum < 0 or blocknum > group.total_num_of_blocks:
 				if typ != '':
 					typ += ' '
 				sys.stdout.write('INVALID '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
@@ -207,7 +165,52 @@ def inodeDirCheck(lines):
 					damaged = True
 
 def process_csv(lines):
-	blockData(lines)
+	blocks = defaultdict(list)
+	super_block = None
+	group = None
+
+	for line in lines:
+		field = line.split(',')
+		if field[0] == 'SUPERBLOCK':
+			super_block = SuperBlock(field)
+
+		if field[0] == 'GROUP':
+			group = Group(field)
+			
+
+		if field[0] == 'BFREE':
+			blocks[int(field[1])].append(['free'])
+
+		if field[0] == 'INODE':
+			inode_num = int(field[1])
+			for i in range(12, 27):
+				block_num = int(field[i])
+				offset = i - 12
+				if i < 24:
+					typ = ''
+				elif i == 24:
+					typ = 'INDIRECT'
+				elif i == 25:
+					typ = 'DOUBLE INDIRECT'
+					offset = 12 + 256
+				elif i == 26:
+					typ = 'TRIPLE INDIRECT'
+					offset = 12 + 256 + 256*256
+
+				info = [typ, inode_num, offset]
+				if block_num != 0:
+					blocks[block_num].append(info)
+
+		if field[0] == 'INDIRECT':
+			typ = ''
+			inode_num = field[1]
+			block_num = int(field[5])
+			offset = int(field[3])
+			info = [typ, inode_num, offset]
+			blocks[block_num].append(info)
+
+
+	blockData(super_block, group, blocks, lines)
 	inodeDirCheck(lines)
  
 def main():

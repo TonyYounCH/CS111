@@ -85,7 +85,6 @@ def block_check(super_block, group, blocks):
 						sys.stdout.write('DUPLICATE ' + info[0] +'BLOCK ' + str(block_num)+' IN INODE '+str(info[1])+' AT OFFSET '+str(info[2])+'\n')
 						damaged = True
 		for info in infos:
-			typ = info[0]
 			if info[0] != 'free':
 				if block_num < 0 or block_num > group.total_num_of_blocks:
 					sys.stdout.write('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
@@ -167,20 +166,23 @@ def process_csv(lines):
 			inodes.append(Inode(field))
 			for i in range(12, 27):
 				block_num = int(field[i])
-				offset = i - 12
+				info = list()
+				logical_offset = i - 12
 				if i == 24:
-					typ = 'INDIRECT '
+					info.append('INDIRECT ')
 				elif i == 25:
-					typ = 'DOUBLE INDIRECT '
-					offset = 12 + 256
+					info.append('DOUBLE INDIRECT ')
+					logical_offset = 12 + 256
 				elif i == 26:
-					typ = 'TRIPLE INDIRECT '
-					offset = 12 + 256 + 256*256
+					info.append('TRIPLE INDIRECT ')
+					logical_offset = 12 + 256 + 256*256
 				else:
-					typ = ''
+					info.append('')
+				info.append(int(field[1]))
+				info.append(logical_offset)
 
 				if block_num != 0:
-					blocks[block_num].append([typ, int(field[1]), offset])
+					blocks[block_num].append(info)
 
 		if field[0] == 'INDIRECT':
 			typ = ''

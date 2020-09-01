@@ -7,8 +7,6 @@
 from collections import defaultdict
 import sys
 
-damaged = False
-
 class SuperBlock:
 	def __init__(self, field):
 		self.num_blocks = int(field[1])
@@ -54,6 +52,7 @@ class Dirent:
 		self.name = str(field[6]).rstrip('\r\n')
 
 def block_check(super_block, group, blocks):
+	damaged = False
 	valid_block_start = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
 	curr = valid_block_start
 	for block_num in blocks:
@@ -92,11 +91,13 @@ def block_check(super_block, group, blocks):
 					if info[0] != 'BFREE':
 						print('DUPLICATE ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]))
 						damaged = True
+	return damaged
 
 def inode_check(super_block, free_inodes, list_dirent, inodes):
 	link_count_dict = dict()
 	parent_inode_dict = dict()
 	inode_nums = list()
+	damaged = False
 
 	for dirent in list_dirent:
 		if dirent.inode_num not in link_count_dict:
@@ -138,6 +139,7 @@ def inode_check(super_block, free_inodes, list_dirent, inodes):
 			if dirent.inode_num != parent_inode_dict[dirent.parent_inode_num]:
 				print('DIRECTORY INODE ' + str(dirent.parent_inode_num) + ' NAME ' + str(dirent.name) + ' LINK TO INODE ' + str(dirent.inode_num) + ' SHOULD BE ' + str(parent_inode_dict[dirent.parent_inode_num]))
 				damaged = True
+	return damaged
 
 def process_csv(lines):
 	blocks = defaultdict(list)
@@ -189,8 +191,10 @@ def process_csv(lines):
 		if field[0] == 'DIRENT':
 			list_dirent.append(Dirent(field))
 
-	block_check(super_block, group, blocks)
-	inode_check(super_block, free_inodes, list_dirent, inodes)
+	d1 = block_check(super_block, group, blocks)
+	d2 = inode_check(super_block, free_inodes, list_dirent, inodes)
+
+	return d1 or d2
  
 def main():
 	if len(sys.argv) != 2:
@@ -204,12 +208,12 @@ def main():
 		exit(1)
 
 	lines = input_file.readlines()
-	process_csv(lines)
+	damaged = process_csv(lines)
 
 	if damaged:
-		exit(0)
-	else :
 		exit(2)
+	else :
+		exit(0)
 
 if __name__ == '__main__':
 	main()

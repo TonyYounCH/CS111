@@ -207,9 +207,9 @@ def main():
 	process_csv(lines)
 
 	if damaged:
-		exit(1)
-	else :
 		exit(0)
+	else :
+		exit(2)
 
 if __name__ == '__main__':
 	main()

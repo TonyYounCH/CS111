@@ -8,17 +8,94 @@ from collections import defaultdict
 from sets import Set
 import sys
 
+
+class SuperBlock:
+    def __init__(self, field):
+        self.total_blocks = int(field[1])
+        self.total_inodes = int(field[2])
+        self.block_size = int(field[3])
+        self.inode_size = int(field[4])
+        self.blocks_per_group = int(field[5])
+        self.inodes_per_group = int(field[6])
+        self.first_non_reserved_inode = int(field[7])
+
+class Group:
+    def __init__(self, field):
+        self.group_num = int(field[1])
+        self.total_num_of_blocks = int(field[2])
+        self.total_num_of_inodes = int(field[3])
+        self.num_free_blocks = int(field[4])
+        self.num_free_inodes = int(field[5])
+        self.bitmap = int(field[6])
+        self.imap = int(field[7])
+        self.first_block = int(field[8])
+
+class Inode:
+    def read_blocks(self, field):
+        list_blocks = []
+        if field[2] != 's':
+            for i in range(12, 24):
+                list_blocks.append(int(field[i]))
+        return list_blocks
+
+    def read_pointers(self, field):
+        list_pointers = []
+        if field[2] != 's':
+            for i in range(24, 27):
+                list_pointers.append(int(field[i]))
+        return list_pointers
+
+    def __init__(self, field):
+        self.inode_num = int(field[1])
+        self.file_type = (field[2])
+        self.mode = field[3]
+        self.owner = int(field[4])
+        self.group = int(field[5])
+        self.link_count = int(field[6])
+        self.change_time = field[7]
+        self.mod_time = field[8]
+        self.access_time = field[9]
+        self.file_size = int(field[10])
+        self.block_num = int(field[11])
+        self.list_blocks = self.read_blocks(field)
+        self.list_pointers = self.read_pointers(field)
+
+
+class Dirent:
+    def __init__(self, field):
+        self.parent_inode_num = int(field[1])
+        self.offset = int(field[2])
+        self.inode_num = int(field[3])
+        self.entry_length = int(field[4])
+        self.name_length = int(field[5])
+        self.name = str(field[6])
+
+class Indirect:
+    def __init__(self, field):
+        self.inode_num = int(field[1])
+        self.indirection_level = int(field[2])
+        self.offset = int(field[3])
+        self.indirect_block_num = int(field[4])
+        self.ref_block_num = int(field[5])
+
+
 blocks = defaultdict(list)
 damaged = False
 
 def blockData(lines):
+	super_block = None
+	group = None
+	inodes = list()
+
 	for line in lines:
 		fields = line.split(',')
 		if fields[0] == 'SUPERBLOCK':
+			super_block = SuperBlock(fields)
 			block_size = int(fields[3])
 			inode_size = int(fields[4])
 
 		if fields[0] == 'GROUP':
+			group = Group(fields)
 			num_blocks = int(fields[2])
 			num_inodes = int(fields[3])
 			first_valid_block = int(fields[8]) + inode_size * num_inodes / block_size
@@ -27,6 +104,7 @@ def blockData(lines):
 			blocks[int(fields[1])].append(['free'])
 
 		if fields[0] == 'INODE':
+			inodes.append(Inode(fields))
 			inode_num = int(fields[1])
 			for i in range(12, 27):
 				block_num = int(fields[i])

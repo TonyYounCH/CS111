@@ -60,46 +60,40 @@ def block_check(super_block, group, blocks):
 		if i > block_num:
 			continue
 		while i != block_num and i < 64:
-			sys.stdout.write('UNREFERENCED BLOCK '+str(i)+'\n')
+			sys.stdout.write('UNREFERENCED BLOCK ' + str(i) + '\n')
 			damaged = True
-			i = i + 1
-		i = i + 1
+			i += 1
+		i += 1
 
 	for block_num, infos in blocks.iteritems():
 		if len(infos) > 1:
-			allocated_and_free = [0, 0]
 			free = False
 			notfree = False
-			num_references = 0
+			count = 0
 			for info in infos:
 				if info[0] == 'free':
 					free = True
 				else:
 					notfree = True
-					num_references = num_references + 1
+					count += 1
 			if free and notfree:
-				sys.stdout.write('ALLOCATED BLOCK '+str(block_num)+' ON FREELIST'+'\n')
+				sys.stdout.write('ALLOCATED BLOCK ' + str(block_num) + ' ON FREELIST'+'\n')
 				damaged = True
-			if num_references > 1:
+			if count > 1:
 				for info in infos:
 					if info[0] != 'free':
-						typ = info[0]
-						inum = info[1]
-						offset = info[2]
-						sys.stdout.write('DUPLICATE '+typ+'BLOCK '+str(block_num)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+						sys.stdout.write('DUPLICATE ' + info[0] +'BLOCK ' + str(block_num)+' IN INODE '+str(info[1])+' AT OFFSET '+str(info[2])+'\n')
 						damaged = True
 		for info in infos:
 			typ = info[0]
-			if typ != 'free':
-				inum = info[1]
-				offset =  info[2]
-			if block_num < 0 or block_num > group.total_num_of_blocks:
-				sys.stdout.write('INVALID '+typ+'BLOCK '+str(block_num)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
-				damaged = True
+			if info[0] != 'free':
+				if block_num < 0 or block_num > group.total_num_of_blocks:
+					sys.stdout.write('INVALID ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
+					damaged = True
 
-			if block_num > 0 and block_num < first_valid_block:
-				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(block_num)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
-				damaged = True
+				if block_num > 0 and block_num < first_valid_block:
+					sys.stdout.write('RESERVED ' + info[0] + 'BLOCK ' + str(block_num) + ' IN INODE ' + str(info[1]) + ' AT OFFSET ' + str(info[2]) + '\n')
+					damaged = True
 
 def inode_check(super_block, free_inodes, list_dirent, inodes):
 	linkCounts = dict()

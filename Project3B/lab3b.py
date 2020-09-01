@@ -52,55 +52,56 @@ class Dirent:
 		self.entry_length = int(field[4])
 		self.name_length = int(field[5])
 		self.name = str(field[6]).rstrip('\r\n')
-		
-def blockData(super_block, group, blocks):
+
+def block_check(super_block, group, blocks):
 	first_valid_block = group.first_block + super_block.inode_size * group.total_num_of_inodes / super_block.block_size
 	i = first_valid_block
-	for blocknum in blocks:
-		if i > blocknum:
+	for block_num in blocks:
+		if i > block_num:
 			continue
-		while i != blocknum and i < 64:
+		while i != block_num and i < 64:
 			sys.stdout.write('UNREFERENCED BLOCK '+str(i)+'\n')
 			damaged = True
 			i = i + 1
 		i = i + 1
 
-
-	for blocknum, lst in blocks.iteritems():
-		if len(lst) > 1:
+	for block_num, infos in blocks.iteritems():
+		if len(infos) > 1:
 			allocated_and_free = [0, 0]
+			free = False
+			notfree = False
 			num_references = 0
-			for item in lst:
-				if item[0] == 'free':
-					allocated_and_free[0] = 1
-				if item[0] != 'free':
-					allocated_and_free[1] = 1
+			for info in infos:
+				if info[0] == 'free':
+					free = True
+				else:
+					notfree = True
 					num_references = num_references + 1
-			if allocated_and_free[0] == 1 and allocated_and_free[1] == 1:
-				sys.stdout.write('ALLOCATED BLOCK '+str(blocknum)+' ON FREELIST'+'\n')
+			if free and notfree:
+				sys.stdout.write('ALLOCATED BLOCK '+str(block_num)+' ON FREELIST'+'\n')
 				damaged = True
 			if num_references > 1:
-				for item in lst:
-					if item[0] != 'free':
-						typ = item[0]
-						inum = item[1]
-						offset = item[2]
-						sys.stdout.write('DUPLICATE '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+				for info in infos:
+					if info[0] != 'free':
+						typ = info[0]
+						inum = info[1]
+						offset = info[2]
+						sys.stdout.write('DUPLICATE '+typ+'BLOCK '+str(block_num)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 						damaged = True
-		for item in lst:
-			typ = item[0]
+		for info in infos:
+			typ = info[0]
 			if typ != 'free':
-				inum = item[1]
-				offset =  item[2]
-			if blocknum < 0 or blocknum > group.total_num_of_blocks:
-				sys.stdout.write('INVALID '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+				inum = info[1]
+				offset =  info[2]
+			if block_num < 0 or block_num > group.total_num_of_blocks:
+				sys.stdout.write('INVALID '+typ+'BLOCK '+str(block_num)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-			if blocknum > 0 and blocknum < first_valid_block:
-				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(blocknum)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
+			if block_num > 0 and block_num < first_valid_block:
+				sys.stdout.write('RESERVED '+typ+'BLOCK '+str(block_num)+' IN INODE '+str(inum)+' AT OFFSET '+str(offset)+'\n')
 				damaged = True
 
-def inodeDirCheck(super_block, free_nodes, list_dirent, inodes):
+def inode_check(super_block, free_inodes, list_dirent, inodes):
 	linkCounts = dict()
 	parentInode = dict()
 	allocnodes = list()
@@ -114,7 +115,7 @@ def inodeDirCheck(super_block, free_nodes, list_dirent, inodes):
 			parentInode[dirent.inode_num] = dirent.parent_inode_num
 
 	for inode in inodes:
-		if inode.inode_num in free_nodes:
+		if inode.inode_num in free_inodes:
 			sys.stdout.write('ALLOCATED INODE ' + str(inode.inode_num) + ' ON FREELIST'+'\n')
 			damaged = True
 		allocnodes.append(inode.inode_num)
@@ -125,9 +126,8 @@ def inodeDirCheck(super_block, free_nodes, list_dirent, inodes):
 			sys.stdout.write('INODE ' + str(inode.inode_num) + ' HAS 0 LINKS BUT LINKCOUNT IS ' + str(inode.link_count) + '\n')
 			damaged = True
 
-	#After we know which nodes are allocated, check for missing unallocated node entries
 	for x in range(super_block.first_non_reserved_inode, super_block.num_inodes + 1):
-		if x not in free_nodes and x not in allocnodes:
+		if x not in free_inodes and x not in allocnodes:
 			sys.stdout.write('UNALLOCATED INODE ' + str(x) + ' NOT ON FREELIST' + '\n')
 			damaged = True
 
@@ -153,7 +153,7 @@ def process_csv(lines):
 	group = None
 	inodes = list()
 	list_dirent = list()
-	free_nodes = list()
+	free_inodes = list()
 
 	for line in lines:
 		field = line.split(',')
@@ -167,7 +167,7 @@ def process_csv(lines):
 			blocks[int(field[1])].append(['free'])
 
 		if field[0] == 'IFREE':
-			free_nodes.append(int(field[1]))
+			free_inodes.append(int(field[1]))
 
 		if field[0] == 'INODE':
 			inodes.append(Inode(field))
@@ -199,8 +199,8 @@ def process_csv(lines):
 		if field[0] == 'DIRENT':
 			list_dirent.append(Dirent(field))
 
-	blockData(super_block, group, blocks)
-	inodeDirCheck(super_block, free_nodes, list_dirent, inodes)
+	block_check(super_block, group, blocks)
+	inode_check(super_block, free_inodes, list_dirent, inodes)
  
 def main():
 	if len(sys.argv) != 2:
